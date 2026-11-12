@@ -114,9 +114,10 @@
             android:turnScreenOn="true"
             android:taskAffinity="com.bitdroid.dialer.incall" />
 
-        <!-- Telecom binds this for every call while bitDialer is the default phone app. -->
+        <!-- Telecom binds this for every call while bitDialer is the default phone app. The class name is
+             the one Telecom hardcodes for the system dialer, so it also works when bitDialer is built into the ROM. -->
         <service
-            android:name=".call.CallService"
+            android:name="com.android.incallui.InCallServiceImpl"
             android:directBootAware="true"
             android:exported="true"
             android:foregroundServiceType="phoneCall"

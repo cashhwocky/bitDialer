@@ -586,7 +586,7 @@ fun SettingsScreen(vm: DialerViewModel) {
                 }
             }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.1") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.2") {} }
         }
     }
 }

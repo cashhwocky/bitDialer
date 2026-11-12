@@ -11,7 +11,7 @@ import android.telecom.InCallService
  * Telecom binds this while bitDialer is the default phone app and hands it every call.
  * It keeps [CallManager] in sync and shows the call screen or the incoming-call notification.
  */
-class CallService : InCallService() {
+open class CallService : InCallService() {
     private val callback = object : Call.Callback() {
         override fun onStateChanged(call: Call, state: Int) = sync()
         override fun onDetailsChanged(call: Call, details: Call.Details) = sync()

@@ -119,7 +119,7 @@ class InCallActivity : ComponentActivity() {
                 val primary = CallManager.primary(calls)
                 LaunchedEffect(calls) {
                     if (calls.isEmpty() || calls.all { it.ended }) {
-                        delay(1200)
+                        delay(if (calls.isEmpty()) 5000 else 1200)
                         if (CallManager.calls.value.let { it.isEmpty() || it.all { c -> c.ended } }) finishAndRemoveTask()
                     }
                 }
