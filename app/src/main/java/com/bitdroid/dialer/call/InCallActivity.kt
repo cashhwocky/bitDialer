@@ -63,6 +63,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -352,24 +353,30 @@ private fun GlassPill(icon: ImageVector, label: String, modifier: Modifier, onCl
 
 @Composable
 private fun SlideUpToAnswer(modifier: Modifier, onAnswer: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    val drag = remember { Animatable(0f) } // 0 = resting at the bottom, grows upward
+    // Plain state (not an Animatable) so drag updates can never cancel the release handling.
+    var drag by remember { mutableFloatStateOf(0f) } // 0 = resting at the bottom, grows upward
     var dragging by remember { mutableStateOf(false) }
+    var answered by remember { mutableStateOf(false) }
     val bob = rememberInfiniteTransition(label = "bob")
     val nudge by bob.animateFloat(0f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "n")
     val density = LocalDensity.current
+    fun answer() {
+        if (answered) return
+        answered = true
+        onAnswer()
+    }
     BoxWithConstraints(
         modifier.clip(RoundedCornerShape(34.dp)).background(Color.Black.copy(alpha = 0.35f))
             .border(2.5.dp, Color.White, RoundedCornerShape(34.dp))
             .semantics {
                 contentDescription = "Answer"
-                onClick { onAnswer(); true }
+                onClick { answer(); true }
             },
     ) {
         val knob = with(density) { 72.dp.toPx() }
         val pad = with(density) { 10.dp.toPx() }
-        val max = with(density) { maxHeight.toPx() } - knob - pad * 2
-        val progress = (drag.value / max).coerceIn(0f, 1f)
+        val max = (with(density) { maxHeight.toPx() } - knob - pad * 2).coerceAtLeast(1f)
+        val progress = (drag / max).coerceIn(0f, 1f)
         Column(
             Modifier.align(Alignment.TopCenter).padding(top = 16.dp).graphicsLayer { alpha = 1f - progress },
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -378,22 +385,27 @@ private fun SlideUpToAnswer(modifier: Modifier, onAnswer: () -> Unit) {
             Text("SLIDE UP", style = mono(11.5f, color = Color.White, spacing = 1.6f))
             Text("TO ANSWER", style = mono(11.5f, color = Color.White, spacing = 1.6f))
         }
-        val bobPx = if (dragging || drag.value > 0f) 0f else with(density) { 8.dp.toPx() } * nudge
+        val bobPx = if (dragging || drag > 0f) 0f else with(density) { 8.dp.toPx() } * nudge
         Box(
             Modifier.align(Alignment.BottomCenter).padding(10.dp)
-                .offset { IntOffset(0, -(drag.value + bobPx).roundToInt()) }
+                .offset { IntOffset(0, -(drag + bobPx).roundToInt()) }
                 .fillMaxWidth().height(72.dp).clip(RoundedCornerShape(26.dp)).background(Bit.Accent)
+                .clickable { answer() }
                 .draggable(
                     orientation = Orientation.Vertical,
-                    state = rememberDraggableState { d -> scope.launch { drag.snapTo((drag.value - d).coerceIn(0f, max)) } },
+                    state = rememberDraggableState { d ->
+                        drag = (drag - d).coerceIn(0f, max)
+                        // Answer the moment it crosses the line, even before the finger lifts.
+                        if (drag >= max * 0.85f) answer()
+                    },
                     onDragStarted = { dragging = true },
                     onDragStopped = {
                         dragging = false
-                        if (drag.value > max * 0.7f) {
-                            drag.animateTo(max)
-                            onAnswer()
+                        if (drag > max * 0.6f) {
+                            answer()
+                            drag = max
                         } else {
-                            drag.animateTo(0f, Bit.bouncy)
+                            androidx.compose.animation.core.animate(drag, 0f, animationSpec = Bit.bouncy) { v, _ -> drag = v }
                         }
                     },
                 ),

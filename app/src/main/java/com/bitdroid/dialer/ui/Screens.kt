@@ -637,7 +637,7 @@ fun SettingsScreen(vm: DialerViewModel) {
             item { SectionRule("CALL DIAGNOSTICS") }
             item { CallDiagnostics() }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.4") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.5") {} }
         }
     }
 }
@@ -795,6 +795,11 @@ private fun CallDiagnostics() {
         ch != null && ch.importance >= android.app.NotificationManager.IMPORTANCE_HIGH
     }
     val events = remember(tick, countdown) { com.bitdroid.dialer.call.Diag.read(context) }
+    val dndOff = remember(tick, countdown) {
+        context.getSystemService(android.app.NotificationManager::class.java)?.currentInterruptionFilter.let {
+            it == null || it == android.app.NotificationManager.INTERRUPTION_FILTER_ALL || it == android.app.NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        }
+    }
 
     fun open(i: Intent) {
         try {
@@ -825,6 +830,11 @@ private fun CallDiagnostics() {
             )
         }
 
+        DiagRow(
+            dndOff, "Do Not Disturb",
+            if (dndOff) "Off" else "On — calls only pop up full screen for people you allow in Do Not Disturb",
+            if (dndOff) null else "OPEN",
+        ) { open(Intent(Settings.ACTION_ZEN_MODE_PRIORITY_SETTINGS)) }
         Spacer(Modifier.height(4.dp))
         Box(
             Modifier.fillMaxWidth().height(56.dp).clip(CircleShape)
