@@ -112,6 +112,9 @@ class MainActivity : ComponentActivity() {
                                 Screen.SETTINGS -> SettingsScreen(vm)
                             }
                         }
+                        androidx.compose.foundation.layout.Box(Modifier.align(androidx.compose.ui.Alignment.TopCenter)) {
+                            com.bitdroid.dialer.ui.ReturnToCallBar()
+                        }
                     }
                 }
             }

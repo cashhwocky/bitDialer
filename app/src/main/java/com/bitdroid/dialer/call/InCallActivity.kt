@@ -199,14 +199,18 @@ private fun MovingGradient(useMonet: Boolean, intense: Boolean) {
 
 // ============================================================== shared
 
+private fun phoneAccounts(context: android.content.Context): List<android.telecom.PhoneAccountHandle> = try {
+    context.getSystemService(TelecomManager::class.java)?.callCapablePhoneAccounts.orEmpty()
+} catch (_: SecurityException) {
+    emptyList()
+}
+
 @Composable
 private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
     val context = LocalContext.current
     val name = c.contact.name ?: Phone.format(context, c.number).ifBlank { "Unknown" }
     val sim = c.call.details?.accountHandle?.let { h ->
-        context.getSystemService(TelecomManager::class.java)?.callCapablePhoneAccounts?.let { list ->
-            if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null
-        }
+        phoneAccounts(context).let { list -> if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null }
     }
     if (c.ringing) Incoming(c, name, sim) else Ongoing(c, all, name, sim, audio)
 }
@@ -437,8 +441,8 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, au
             c.selectingSim -> {
                 val tm = context.getSystemService(TelecomManager::class.java)
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    tm?.callCapablePhoneAccounts.orEmpty().forEachIndexed { i, h ->
-                        val label = tm?.getPhoneAccount(h)?.label?.toString() ?: "SIM ${i + 1}"
+                    phoneAccounts(context).forEachIndexed { i, h ->
+                        val label = runCatching { tm?.getPhoneAccount(h)?.label?.toString() }.getOrNull() ?: "SIM ${i + 1}"
                         Tile(Icons.Rounded.SimCard, "SIM ${i + 1}", label.uppercase(), false, Modifier.fillMaxWidth().height(80.dp)) { CallManager.chooseSim(c, h) }
                     }
                 }

@@ -1,6 +1,8 @@
 package com.bitdroid.dialer.call
 
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.util.Log
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
@@ -29,6 +31,7 @@ class CallService : InCallService() {
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
+        Log.i("bitDialer", "call added, state=${call.details?.state}")
         call.registerCallback(callback)
         sync()
         if (call.details?.state != Call.STATE_RINGING) openScreen()
@@ -44,9 +47,27 @@ class CallService : InCallService() {
         CallManager.setAudio(audioState)
     }
 
+    private var foreground = false
+
     private fun sync() {
         CallManager.update(this, calls.toList())
-        CallNotifier.refresh(this, CallManager.calls.value)
+        val list = CallManager.calls.value
+        val n = CallNotifier.build(this, list)
+        if (n == null) {
+            if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
+            foreground = false
+            CallNotifier.cancelAll(this)
+            return
+        }
+        try {
+            // A phoneCall foreground service is what gives the status-bar call chip and keeps
+            // the call alive while bitDialer is in the background.
+            startForeground(CallNotifier.NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL)
+            foreground = true
+        } catch (e: Exception) {
+            Log.e("bitDialer", "startForeground failed, posting plain notification", e)
+            CallNotifier.buildPlain(this, list)?.let { CallNotifier.post(this, it) }
+        }
     }
 
     private fun openScreen() {
@@ -55,7 +76,8 @@ class CallService : InCallService() {
                 Intent(this, InCallActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NO_USER_ACTION),
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("bitDialer", "couldn't open call screen", e)
         }
     }
 }

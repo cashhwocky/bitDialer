@@ -99,7 +99,46 @@ import com.bitdroid.dialer.data.Prefs
 fun call(context: android.content.Context, number: String) {
     if (number.isBlank()) return
     if (!CallManager.placeCall(context, number)) {
-        Toast.makeText(context, "Set bitDialer as your phone app to make calls", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Couldn't start the call. Make sure bitDialer is your default phone app.", Toast.LENGTH_LONG).show()
+        return
+    }
+    // We're in the foreground, so open the call screen directly instead of waiting on Telecom.
+    openCallScreen(context)
+}
+
+fun openCallScreen(context: android.content.Context) {
+    context.startActivity(
+        Intent(context, com.bitdroid.dialer.call.InCallActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+    )
+}
+
+/** Shown at the top of the app while a call is live: tap to go back to it. */
+@Composable
+fun ReturnToCallBar() {
+    val calls by CallManager.calls.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val p = CallManager.primary(calls)
+    if (p == null || p.ended) return
+    Row(
+        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 14.dp, vertical = 6.dp)
+            .clip(CircleShape).background(Bit.Accent).clickable { openCallScreen(context) }
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Call, null, tint = Bit.OnAccent, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            (p.contact.name ?: Phone.format(context, p.number)) + " · " + when {
+                p.ringing -> "INCOMING"
+                p.dialing -> "CALLING…"
+                p.holding -> "ON HOLD"
+                else -> "ON CALL"
+            },
+            style = mono(12f, color = Bit.OnAccent, spacing = 1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text("RETURN", style = mono(11f, color = Bit.OnAccent, spacing = 1.2f))
     }
 }
 
@@ -547,7 +586,7 @@ fun SettingsScreen(vm: DialerViewModel) {
                 }
             }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.0") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.1") {} }
         }
     }
 }

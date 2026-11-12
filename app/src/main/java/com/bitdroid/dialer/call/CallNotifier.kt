@@ -1,6 +1,7 @@
 package com.bitdroid.dialer.call
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -61,16 +62,15 @@ object CallNotifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
-    fun refresh(context: Context, calls: List<UiCall>) {
-        val p = CallManager.primary(calls)
-        if (p == null || (p.ended && calls.all { it.ended })) {
-            cancelAll(context)
-            return
-        }
-        if (!canPost(context)) return
+    const val NOTIFICATION_ID = ID
+
+    /** Builds the call notification for the current calls, or null when there's nothing live. */
+    fun build(context: Context, calls: List<UiCall>): Notification? {
+        val p = CallManager.primary(calls) ?: return null
+        if (calls.all { it.ended }) return null
         val who = p.contact.name ?: Phone.format(context, p.number).ifBlank { "Unknown" }
         val person = Person.Builder().setName(who).setImportant(true).build()
-        val n = if (p.ringing) {
+        return if (p.ringing) {
             NotificationCompat.Builder(context, CH_INCOMING)
                 .setSmallIcon(R.drawable.ic_stat_call)
                 .setColor(ACCENT)
@@ -103,16 +103,44 @@ object CallNotifier {
                 )
                 .setUsesChronometer(p.active && p.connectTime > 0)
                 .setWhen(if (p.connectTime > 0) p.connectTime else System.currentTimeMillis())
+                .setShowWhen(p.active)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setOngoing(true)
                 .setSilent(true)
                 .setContentIntent(screenIntent(context))
-                .addAction(R.drawable.ic_stat_call, "Hang up", broadcast(context, ACTION_HANGUP, 3))
+                // CallStyle gives the green call chip in the status bar; valid because CallService
+                // runs as a phoneCall foreground service while a call is live.
+                .setStyle(NotificationCompat.CallStyle.forOngoingCall(person, broadcast(context, ACTION_HANGUP, 3)))
                 .build()
         }
+    }
+
+    /** Plain fallback (no CallStyle) for when the foreground service can't start. */
+    fun buildPlain(context: Context, calls: List<UiCall>): Notification? {
+        val p = CallManager.primary(calls) ?: return null
+        if (p.ringing) return build(context, calls)
+        val who = p.contact.name ?: Phone.format(context, p.number).ifBlank { "Unknown" }
+        return NotificationCompat.Builder(context, CH_ONGOING)
+            .setSmallIcon(R.drawable.ic_stat_call)
+            .setColor(ACCENT)
+            .setContentTitle(who)
+            .setContentText(if (p.dialing) "Calling…" else if (p.holding) "On hold" else "On call")
+            .setUsesChronometer(p.active && p.connectTime > 0)
+            .setWhen(if (p.connectTime > 0) p.connectTime else System.currentTimeMillis())
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setOngoing(true)
+            .setSilent(true)
+            .setContentIntent(screenIntent(context))
+            .addAction(R.drawable.ic_stat_call, "Hang up", broadcast(context, ACTION_HANGUP, 3))
+            .build()
+    }
+
+    fun post(context: Context, n: Notification) {
+        if (!canPost(context)) return
         try {
             NotificationManagerCompat.from(context).notify(ID, n)
-        } catch (_: SecurityException) {
+        } catch (e: Exception) {
+            android.util.Log.e("bitDialer", "notify failed", e)
         }
     }
 
