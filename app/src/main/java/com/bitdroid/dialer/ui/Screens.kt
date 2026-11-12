@@ -95,6 +95,7 @@ import com.bitdroid.dialer.data.Contacts
 import com.bitdroid.dialer.data.Favorite
 import com.bitdroid.dialer.data.Phone
 import com.bitdroid.dialer.data.Prefs
+import kotlinx.coroutines.launch
 
 fun call(context: android.content.Context, number: String) {
     if (number.isBlank()) return
@@ -633,8 +634,10 @@ fun SettingsScreen(vm: DialerViewModel) {
                     }
                 }
             }
+            item { SectionRule("CALL DIAGNOSTICS") }
+            item { CallDiagnostics() }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.3") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.4") {} }
         }
     }
 }
@@ -759,6 +762,135 @@ private fun IconPicker() {
                     Text(c.label, style = mono(10f, color = if (on) Bit.Accent else Bit.TextDim, spacing = 0.8f))
                 }
             }
+        }
+    }
+}
+
+// ======================================================= call diagnostics
+
+@Composable
+private fun CallDiagnostics() {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var tick by remember { mutableStateOf(0) }
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) tick++
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    var countdown by remember { mutableStateOf(0) }
+    val pkgUri = Uri.fromParts("package", context.packageName, null)
+
+    val isDefault = remember(tick) {
+        context.getSystemService(android.app.role.RoleManager::class.java)?.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER) == true
+    }
+    val notifs = remember(tick) { com.bitdroid.dialer.call.CallNotifier.canPost(context) }
+    val fullScreen = remember(tick) { com.bitdroid.dialer.call.CallNotifier.fullScreenAllowed(context) }
+    val channelOk = remember(tick) {
+        val ch = context.getSystemService(android.app.NotificationManager::class.java)?.getNotificationChannel("incoming_calls")
+        ch != null && ch.importance >= android.app.NotificationManager.IMPORTANCE_HIGH
+    }
+    val events = remember(tick, countdown) { com.bitdroid.dialer.call.Diag.read(context) }
+
+    fun open(i: Intent) {
+        try {
+            context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkgUri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DiagRow(isDefault, "Default phone app", if (isDefault) "bitDialer handles your calls" else "Another app is handling calls", if (isDefault) null else "FIX") {
+            open(Intent("android.settings.MANAGE_DEFAULT_APPS_SETTINGS"))
+        }
+        DiagRow(notifs, "Notifications allowed", if (notifs) "Ready" else "Calls can't ring on screen without this", if (notifs) null else "ALLOW") {
+            open(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+        }
+        DiagRow(fullScreen, "Full-screen calls allowed", if (fullScreen) "Calls can show over the lock screen" else "Needed for the ring screen over the lock screen", if (fullScreen) null else "ALLOW") {
+            open(
+                if (android.os.Build.VERSION.SDK_INT >= 34) Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, pkgUri)
+                else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkgUri),
+            )
+        }
+        DiagRow(channelOk, "Incoming calls notifications", if (channelOk) "On, high priority" else "Turned down or off — calls can't pop up", if (channelOk) null else "FIX") {
+            open(
+                Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, "incoming_calls"),
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier.fillMaxWidth().height(56.dp).clip(CircleShape)
+                .background(if (countdown > 0) Bit.SurfaceHigh else Bit.Accent)
+                .clickable(enabled = countdown == 0) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    scope.launch {
+                        for (i in 5 downTo 1) {
+                            countdown = i
+                            kotlinx.coroutines.delay(1000)
+                        }
+                        countdown = 0
+                        com.bitdroid.dialer.call.CallNotifier.postTest(context)
+                        tick++
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (countdown > 0) "Lock your phone now… $countdown" else "Test incoming call",
+                color = if (countdown > 0) Color.White else Bit.OnAccent, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+            )
+        }
+        Text(
+            "Tap it, then lock your phone. In 5 seconds the full-screen ring screen should appear. If only a notification shows, screenshot this page and send it.",
+            color = Bit.TextDim, fontSize = 13.sp, lineHeight = 18.sp,
+        )
+
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("RECENT CALL EVENTS", style = mono(11f, spacing = 1.4f), modifier = Modifier.weight(1f))
+            Text(
+                "CLEAR", style = mono(11f, color = Bit.Accent, spacing = 1.2f),
+                modifier = Modifier.clip(CircleShape).clickable { com.bitdroid.dialer.call.Diag.clear(context); tick++ }.padding(8.dp),
+            )
+        }
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.White.copy(alpha = 0.04f))
+                .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp)).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (events.isEmpty()) Text("Nothing yet. Make or get a call, then come back.", color = Bit.TextDim, fontSize = 13.sp)
+            events.take(25).forEach { Text(it, style = mono(10.5f, FontWeight.Medium, color = Color.White, spacing = 0f)) }
+        }
+    }
+}
+
+@Composable
+private fun DiagRow(ok: Boolean, title: String, sub: String, action: String?, onAction: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.White.copy(alpha = 0.045f))
+            .border(1.dp, if (ok) Color.White.copy(alpha = 0.07f) else Bit.Missed, RoundedCornerShape(20.dp)).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(12.dp).clip(CircleShape).background(if (ok) Bit.Accent else Bit.Missed))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(sub, color = Bit.TextDim, fontSize = 13.sp, lineHeight = 17.sp)
+        }
+        if (action != null) {
+            Spacer(Modifier.width(10.dp))
+            Box(
+                Modifier.height(36.dp).clip(CircleShape).background(Bit.Accent).clickable(onClick = onAction).padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(action, style = mono(11f, color = Bit.OnAccent, spacing = 1f)) }
         }
     }
 }

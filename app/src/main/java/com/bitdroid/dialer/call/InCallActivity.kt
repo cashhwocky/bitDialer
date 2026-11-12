@@ -105,12 +105,19 @@ import kotlin.math.sin
 /** Full-screen call UI. Shows over the lock screen and turns the screen on for incoming calls. */
 class InCallActivity : ComponentActivity() {
     private var proximity: PowerManager.WakeLock? = null
+    private var testMode = false
+
+    companion object {
+        const val EXTRA_TEST = "bitdialer_test_call"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
+        testMode = intent?.getBooleanExtra(EXTRA_TEST, false) == true
+        Diag.log(this, if (testMode) "test call screen opened" else "call screen opened (calls=${CallManager.calls.value.size})")
         handle(intent)
         setContent {
             BitTheme {
@@ -118,6 +125,7 @@ class InCallActivity : ComponentActivity() {
                 val audio by CallManager.audio.collectAsStateWithLifecycle()
                 val primary = CallManager.primary(calls)
                 LaunchedEffect(calls) {
+                    if (testMode) return@LaunchedEffect
                     if (calls.isEmpty() || calls.all { it.ended }) {
                         delay(if (calls.isEmpty()) 5000 else 1200)
                         if (CallManager.calls.value.let { it.isEmpty() || it.all { c -> c.ended } }) finishAndRemoveTask()
@@ -127,7 +135,16 @@ class InCallActivity : ComponentActivity() {
                 LaunchedEffect(primary?.active, earpiece) { setProximity(primary?.active == true && earpiece) }
                 Box(Modifier.fillMaxSize().background(Bit.Black)) {
                     MovingGradient(useMonet = Prefs.monetBackground(this@InCallActivity), intense = primary?.ringing == true)
-                    if (primary != null) CallScreen(primary, calls, audio)
+                    if (testMode && primary == null) {
+                        Incoming(
+                            contact = com.bitdroid.dialer.data.Contact("", "Test call", null, null),
+                            number = "", name = "Test call", sim = "TEST",
+                            onAnswer = { Diag.log(this@InCallActivity, "test call answered"); CallNotifier.cancelTest(this@InCallActivity); finishAndRemoveTask() },
+                            onDecline = { Diag.log(this@InCallActivity, "test call declined"); CallNotifier.cancelTest(this@InCallActivity); finishAndRemoveTask() },
+                        )
+                    } else if (primary != null) {
+                        CallScreen(primary, calls, audio)
+                    }
                 }
             }
         }
@@ -212,12 +229,23 @@ private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
     val sim = c.call.details?.accountHandle?.let { h ->
         phoneAccounts(context).let { list -> if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null }
     }
-    if (c.ringing) Incoming(c, name, sim) else Ongoing(c, all, name, sim, audio)
+    if (c.ringing) {
+        Incoming(
+            contact = c.contact, number = c.number, name = name, sim = sim,
+            onAnswer = { CallManager.answer(c) },
+            onDecline = { CallManager.decline(c) },
+        )
+    } else {
+        Ongoing(c, all, name, sim, audio)
+    }
 }
 
 /** Rounded-square avatar with an accent frame and a softly breathing outline. */
 @Composable
-private fun SquircleAvatar(c: UiCall, size: Dp) {
+private fun SquircleAvatar(c: UiCall, size: Dp) = SquircleAvatar(c.contact, size)
+
+@Composable
+private fun SquircleAvatar(contact: com.bitdroid.dialer.data.Contact, size: Dp) {
     val t = rememberInfiniteTransition(label = "breathe")
     val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "p")
     val r = size * 0.36f
@@ -227,7 +255,7 @@ private fun SquircleAvatar(c: UiCall, size: Dp) {
                 .border(2.dp, Bit.Accent.copy(alpha = 0.6f), RoundedCornerShape(r + 14.dp)),
         )
         Box(Modifier.size(size).clip(RoundedCornerShape(r)).background(Bit.Accent).padding(5.dp).clip(RoundedCornerShape(r - 5.dp))) {
-            Avatar(listOf(c.contact), size - 10.dp, Modifier, square = true)
+            Avatar(listOf(contact), size - 10.dp, Modifier, square = true)
         }
     }
 }
@@ -252,7 +280,14 @@ private val GlassLine = Color.White.copy(alpha = 0.17f)
 // ============================================================ incoming
 
 @Composable
-private fun Incoming(c: UiCall, name: String, sim: String?) {
+private fun Incoming(
+    contact: com.bitdroid.dialer.data.Contact,
+    number: String,
+    name: String,
+    sim: String?,
+    onAnswer: () -> Unit,
+    onDecline: () -> Unit,
+) {
     val context = LocalContext.current
     val view = LocalView.current
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp)) {
@@ -260,20 +295,20 @@ private fun Incoming(c: UiCall, name: String, sim: String?) {
             Spacer(Modifier.height(18.dp))
             StatusTag(listOfNotNull("INCOMING", sim).joinToString(" · "), pulse = true)
             Spacer(Modifier.height(32.dp))
-            Box(Modifier.offset(x = (-14).dp)) { SquircleAvatar(c, 150.dp) }
+            Box(Modifier.offset(x = (-14).dp)) { SquircleAvatar(contact, 150.dp) }
             Spacer(Modifier.height(20.dp))
             Text(name, fontFamily = Display, fontWeight = FontWeight.Black, fontSize = if (name.length > 12) 40.sp else 56.sp, letterSpacing = (-2).sp, lineHeight = 58.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (c.contact.name != null && c.number.isNotBlank()) {
+            if (contact.name != null && number.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
-                Text(Phone.format(context, c.number).uppercase(), style = mono(13f, color = Color.White.copy(alpha = 0.7f), spacing = 1f))
+                Text(Phone.format(context, number).uppercase(), style = mono(13f, color = Color.White.copy(alpha = 0.7f), spacing = 1f))
             }
         }
         Spacer(Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GlassPill(Icons.AutoMirrored.Rounded.Message, "REPLY", Modifier.weight(1f)) {
-                CallManager.decline(c)
-                if (c.number.isNotBlank()) {
-                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                onDecline()
+                if (number.isNotBlank()) {
+                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }
             GlassPill(Icons.Rounded.NotificationsOff, "SILENCE", Modifier.weight(1f)) { CallManager.silenceRinger(context) }
@@ -284,7 +319,7 @@ private fun Incoming(c: UiCall, name: String, sim: String?) {
                 Modifier.width(112.dp).fillMaxHeight().clip(RoundedCornerShape(34.dp)).background(Bit.Danger)
                     .clickable {
                         view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                        CallManager.decline(c)
+                        onDecline()
                     },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -295,7 +330,7 @@ private fun Incoming(c: UiCall, name: String, sim: String?) {
             }
             SlideUpToAnswer(Modifier.weight(1f).fillMaxHeight()) {
                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                CallManager.answer(c)
+                onAnswer()
             }
         }
         Spacer(Modifier.height(20.dp))

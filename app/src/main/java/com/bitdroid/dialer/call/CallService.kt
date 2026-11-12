@@ -21,6 +21,7 @@ open class CallService : InCallService() {
     override fun onCreate() {
         super.onCreate()
         CallManager.service = this
+        Diag.log(this, "call service connected")
     }
 
     override fun onDestroy() {
@@ -31,7 +32,7 @@ open class CallService : InCallService() {
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
-        Log.i("bitDialer", "call added, state=${call.details?.state}")
+        Diag.log(this, "call added (state ${call.details?.state}, ${if (call.details?.state == Call.STATE_RINGING) "incoming" else "outgoing"})")
         call.registerCallback(callback)
         sync()
         if (call.details?.state != Call.STATE_RINGING) {
@@ -69,9 +70,10 @@ open class CallService : InCallService() {
             // A phoneCall foreground service is what gives the status-bar call chip and keeps
             // the call alive while bitDialer is in the background.
             startForeground(CallNotifier.NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL)
+            if (!foreground) Diag.log(this, "call notification shown (full-screen allowed: ${CallNotifier.fullScreenAllowed(this)})")
             foreground = true
         } catch (e: Exception) {
-            Log.e("bitDialer", "startForeground failed, posting plain notification", e)
+            Diag.log(this, "foreground service failed: ${e.javaClass.simpleName}: ${e.message}")
             CallNotifier.buildPlain(this, list)?.let { CallNotifier.post(this, it) }
         }
     }
@@ -83,13 +85,14 @@ open class CallService : InCallService() {
     }
 
     private fun openScreen() {
+        Diag.log(this, "opening call screen (locked/off: ${deviceLockedOrOff()})")
         try {
             startActivity(
                 Intent(this, InCallActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NO_USER_ACTION),
             )
         } catch (e: Exception) {
-            Log.e("bitDialer", "couldn't open call screen", e)
+            Diag.log(this, "couldn't open call screen: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 }

@@ -42,7 +42,7 @@ object CallNotifier {
         )
     }
 
-    private fun canPost(context: Context) = Build.VERSION.SDK_INT < 33 ||
+    fun canPost(context: Context) = Build.VERSION.SDK_INT < 33 ||
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     private fun screenIntent(context: Context, action: String? = null): PendingIntent =
@@ -63,6 +63,40 @@ object CallNotifier {
         )
 
     const val NOTIFICATION_ID = ID
+    private const val TEST_ID = 4299
+
+    fun fullScreenAllowed(context: Context): Boolean = Build.VERSION.SDK_INT < 34 ||
+        context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+
+    /** Posts a fake incoming call through the same full-screen notification path as a real one. */
+    fun postTest(context: Context) {
+        val open = PendingIntent.getActivity(
+            context, 9,
+            Intent(context, InCallActivity::class.java).apply {
+                putExtra(InCallActivity.EXTRA_TEST, true)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val person = Person.Builder().setName("Test call").setImportant(true).build()
+        val n = NotificationCompat.Builder(context, CH_INCOMING)
+            .setSmallIcon(R.drawable.ic_stat_call)
+            .setColor(ACCENT)
+            .setContentTitle("Test call")
+            .setContentText("Incoming call")
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setFullScreenIntent(open, true)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setTimeoutAfter(30_000)
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(person, open, open))
+            .build()
+        com.bitdroid.dialer.call.Diag.log(context, "test call posted (notifications: ${canPost(context)}, full-screen allowed: ${fullScreenAllowed(context)})")
+        post(context, n, TEST_ID)
+    }
+
+    fun cancelTest(context: Context) = NotificationManagerCompat.from(context).cancel(TEST_ID)
 
     /** Builds the call notification for the current calls, or null when there's nothing live. */
     fun build(context: Context, calls: List<UiCall>): Notification? {
@@ -135,10 +169,10 @@ object CallNotifier {
             .build()
     }
 
-    fun post(context: Context, n: Notification) {
+    fun post(context: Context, n: Notification, id: Int = ID) {
         if (!canPost(context)) return
         try {
-            NotificationManagerCompat.from(context).notify(ID, n)
+            NotificationManagerCompat.from(context).notify(id, n)
         } catch (e: Exception) {
             android.util.Log.e("bitDialer", "notify failed", e)
         }
