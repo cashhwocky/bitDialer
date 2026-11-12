@@ -592,6 +592,7 @@ fun SettingsScreen(vm: DialerViewModel) {
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp)) {
             item { SectionRule("LOOK") }
+            item { ThemePicker() }
             item {
                 Toggle("Monet background", "A glow in your wallpaper colors behind the black", monet) {
                     vm.setMonet(it); view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -643,7 +644,7 @@ fun SettingsScreen(vm: DialerViewModel) {
             item { SectionRule("CALL DIAGNOSTICS") }
             item { CallDiagnostics() }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.8") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.3.0") {} }
         }
     }
 }

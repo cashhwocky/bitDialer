@@ -117,6 +117,7 @@ class InCallActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
+        Bit.apply(this)
         testMode = intent?.getBooleanExtra(EXTRA_TEST, false) == true
         Diag.log(this, if (testMode) "test call screen opened" else "call screen opened (calls=${CallManager.calls.value.size})")
         handle(intent)
