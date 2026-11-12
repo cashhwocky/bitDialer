@@ -53,6 +53,10 @@ class DialerViewModel(app: Application) : AndroidViewModel(app) {
     val monet: StateFlow<Boolean> = _monet
     private val _listStyle = MutableStateFlow(Prefs.listStyle(app))
     val listStyle: StateFlow<Prefs.ListStyle> = _listStyle
+    private val _vibrate = MutableStateFlow(Prefs.vibrateCalls(app))
+    val vibrate: StateFlow<Boolean> = _vibrate
+    fun setVibrate(on: Boolean) { Prefs.setVibrateCalls(ctx, on); _vibrate.value = on }
+
     private val _dtmf = MutableStateFlow(Prefs.dtmfTones(app))
     val dtmf: StateFlow<Boolean> = _dtmf
 

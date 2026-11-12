@@ -584,6 +584,7 @@ fun SettingsScreen(vm: DialerViewModel) {
     val monet by vm.monet.collectAsStateWithLifecycle()
     val style by vm.listStyle.collectAsStateWithLifecycle()
     val dtmf by vm.dtmf.collectAsStateWithLifecycle()
+    val vibrate by vm.vibrate.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().height(68.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.back() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
@@ -616,6 +617,11 @@ fun SettingsScreen(vm: DialerViewModel) {
             }
             item { IconPicker() }
             item { SectionRule("CALLS") }
+            item {
+                Toggle("Vibrate for incoming calls", "Off in Silent mode and Do Not Disturb", vibrate) {
+                    vm.setVibrate(it); view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                }
+            }
             item { Toggle("Keypad tones", "Play a tone when you tap the keypad", dtmf) { vm.setDtmf(it) } }
             item {
                 Row2("Calling accounts & SIMs", "Carrier and SIM call settings") {
@@ -637,7 +643,7 @@ fun SettingsScreen(vm: DialerViewModel) {
             item { SectionRule("CALL DIAGNOSTICS") }
             item { CallDiagnostics() }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.5") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.6") {} }
         }
     }
 }

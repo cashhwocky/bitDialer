@@ -24,7 +24,14 @@ open class CallService : InCallService() {
         Diag.log(this, "call service connected")
     }
 
+    /** Volume or power button pressed while ringing. */
+    override fun onSilenceRinger() {
+        super.onSilenceRinger()
+        CallVibrator.stop(this)
+    }
+
     override fun onDestroy() {
+        CallVibrator.stop(this)
         if (CallManager.service === this) CallManager.service = null
         CallNotifier.cancelAll(this)
         super.onDestroy()
@@ -59,6 +66,7 @@ open class CallService : InCallService() {
     private fun sync() {
         CallManager.update(this, calls.toList())
         val list = CallManager.calls.value
+        if (list.any { it.ringing }) CallVibrator.start(this) else CallVibrator.stop(this)
         val n = CallNotifier.build(this, list)
         if (n == null) {
             if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)

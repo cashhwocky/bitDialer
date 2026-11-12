@@ -19,6 +19,9 @@ object Prefs {
 
     fun setListStyle(context: Context, s: ListStyle) = get(context).edit().putString("list_style", s.name).apply()
 
+    fun vibrateCalls(context: Context): Boolean = get(context).getBoolean("vibrate_calls", true)
+    fun setVibrateCalls(context: Context, on: Boolean) = get(context).edit().putBoolean("vibrate_calls", on).apply()
+
     fun dtmfTones(context: Context): Boolean = get(context).getBoolean("dtmf", true)
     fun setDtmfTones(context: Context, on: Boolean) = get(context).edit().putBoolean("dtmf", on).apply()
 }

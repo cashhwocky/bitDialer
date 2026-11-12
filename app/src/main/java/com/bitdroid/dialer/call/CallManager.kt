@@ -74,8 +74,15 @@ object CallManager {
             ?: list.firstOrNull { it.holding }
             ?: list.firstOrNull()
 
-    fun answer(c: UiCall) = c.call.answer(VideoProfile.STATE_AUDIO_ONLY)
-    fun decline(c: UiCall) = c.call.reject(false, null)
+    fun answer(c: UiCall) {
+        service?.let { CallVibrator.stop(it) }
+        c.call.answer(VideoProfile.STATE_AUDIO_ONLY)
+    }
+
+    fun decline(c: UiCall) {
+        service?.let { CallVibrator.stop(it) }
+        c.call.reject(false, null)
+    }
     fun hangup(c: UiCall) = c.call.disconnect()
 
     fun toggleHold(c: UiCall) {
@@ -112,6 +119,7 @@ object CallManager {
     }
 
     fun silenceRinger(context: Context) {
+        CallVibrator.stop(context)
         try {
             context.getSystemService(TelecomManager::class.java)?.silenceRinger()
         } catch (_: SecurityException) {
