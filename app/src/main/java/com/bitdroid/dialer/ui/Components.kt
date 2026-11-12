@@ -93,7 +93,8 @@ private val avatarColors = listOf(
 )
 
 @Composable
-fun Avatar(contacts: List<Contact>, size: Dp, modifier: Modifier = Modifier) {
+fun Avatar(contacts: List<Contact>, size: Dp, modifier: Modifier = Modifier, square: Boolean = false) {
+    val shape = if (square) androidx.compose.foundation.shape.RoundedCornerShape(percent = 30) else CircleShape
     val single = contacts.singleOrNull()
     val photo = rememberImage(single?.photoUri, 256)
     val seed = (single?.address ?: contacts.joinToString { it.address }).hashCode()
@@ -101,7 +102,7 @@ fun Avatar(contacts: List<Contact>, size: Dp, modifier: Modifier = Modifier) {
     Box(
         modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(shape)
             .background(if (single != null && single.name == null) Bit.SurfaceHigh else bg),
         contentAlignment = Alignment.Center,
     ) {

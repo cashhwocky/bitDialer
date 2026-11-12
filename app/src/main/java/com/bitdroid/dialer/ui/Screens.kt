@@ -526,6 +526,7 @@ fun SettingsScreen(vm: DialerViewModel) {
                     }
                 }
             }
+            item { IconPicker() }
             item { SectionRule("CALLS") }
             item { Toggle("Keypad tones", "Play a tone when you tap the keypad", dtmf) { vm.setDtmf(it) } }
             item {
@@ -546,7 +547,7 @@ fun SettingsScreen(vm: DialerViewModel) {
                 }
             }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.1.0") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.0") {} }
         }
     }
 }
@@ -628,6 +629,48 @@ fun SetupScreen(onSetDefault: () -> Unit, refused: Boolean) {
                     },
                     contentAlignment = Alignment.Center,
                 ) { Text("Open App info", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IconPicker() {
+    val context = LocalContext.current
+    val view = LocalView.current
+    var current by remember { mutableStateOf(com.bitdroid.dialer.data.AppIcons.current(context)) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+        Text("App icon", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text("Your home screen may take a moment to update", color = Bit.TextDim, fontSize = 14.sp)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            com.bitdroid.dialer.data.AppIcons.all.forEach { c ->
+                val on = c.key == current
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(64.dp).clip(CircleShape)
+                            .border(if (on) 3.dp else 1.5.dp, if (on) Bit.Accent else Bit.GlassEdge, CircleShape)
+                            .padding(5.dp).clip(CircleShape).background(Color(c.bg))
+                            .clickable {
+                                if (!on) {
+                                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                    com.bitdroid.dialer.data.AppIcons.set(context, c.key)
+                                    current = c.key
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.foundation.Image(
+                            androidx.compose.ui.res.painterResource(
+                                if (c.darkMark) com.bitdroid.dialer.R.drawable.ic_launcher_foreground_dark else com.bitdroid.dialer.R.drawable.ic_launcher_foreground,
+                            ),
+                            contentDescription = c.label,
+                            modifier = Modifier.size(80.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(c.label, style = mono(10f, color = if (on) Bit.Accent else Bit.TextDim, spacing = 0.8f))
+                }
             }
         }
     }

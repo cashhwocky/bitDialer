@@ -11,11 +11,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +31,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +42,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
@@ -54,6 +59,7 @@ import androidx.compose.material.icons.rounded.SimCard
 import androidx.compose.material.icons.rounded.SwapCalls
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,6 +71,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -75,8 +83,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,12 +95,12 @@ import com.bitdroid.dialer.ui.Avatar
 import com.bitdroid.dialer.ui.Bit
 import com.bitdroid.dialer.ui.BitTheme
 import com.bitdroid.dialer.ui.Display
-import com.bitdroid.dialer.ui.ToggleMark
-import com.bitdroid.dialer.ui.monetGlow
+import com.bitdroid.dialer.ui.Mono
 import com.bitdroid.dialer.ui.mono
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /** Full-screen call UI. Shows over the lock screen and turns the screen on for incoming calls. */
 class InCallActivity : ComponentActivity() {
@@ -117,7 +125,8 @@ class InCallActivity : ComponentActivity() {
                 }
                 val earpiece = audio == null || audio!!.route == CallAudioState.ROUTE_EARPIECE
                 LaunchedEffect(primary?.active, earpiece) { setProximity(primary?.active == true && earpiece) }
-                Box(Modifier.fillMaxSize().background(Bit.Black).monetGlow(Prefs.monetBackground(this@InCallActivity), strong = true)) {
+                Box(Modifier.fillMaxSize().background(Bit.Black)) {
+                    MovingGradient(useMonet = Prefs.monetBackground(this@InCallActivity), intense = primary?.ringing == true)
                     if (primary != null) CallScreen(primary, calls, audio)
                 }
             }
@@ -152,156 +161,218 @@ class InCallActivity : ComponentActivity() {
     }
 }
 
+// =========================================================== background
+
+/** Three soft color blobs drifting slowly behind the call, in Monet colors when that's on. */
+@Composable
+private fun MovingGradient(useMonet: Boolean, intense: Boolean) {
+    val context = LocalContext.current
+    val colors = remember(useMonet) {
+        if (useMonet) {
+            val d = dynamicDarkColorScheme(context)
+            listOf(d.primary, d.tertiary, d.secondary)
+        } else {
+            listOf(Color(0xFF3E7CF5), Color(0xFF8E6CF0), Color(0xFF2BB5C9))
+        }
+    }
+    val t = rememberInfiniteTransition(label = "bg")
+    val a by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing)), label = "a")
+    val b by t.animateFloat(0f, 1f, infiniteRepeatable(tween(17000, easing = LinearEasing)), label = "b")
+    val c by t.animateFloat(0f, 1f, infiniteRepeatable(tween(19000, easing = LinearEasing)), label = "c")
+    val strength = if (intense) 0.62f else 0.48f
+    Canvas(Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val tau = (2 * Math.PI).toFloat()
+        fun blob(color: Color, cx: Float, cy: Float, r: Float, alpha: Float) {
+            drawCircle(
+                Brush.radialGradient(listOf(color.copy(alpha = alpha), color.copy(alpha = alpha * 0.35f), Color.Transparent), center = Offset(cx, cy), radius = r),
+                radius = r, center = Offset(cx, cy),
+            )
+        }
+        blob(colors[0], w * (0.15f + 0.18f * sin(a * tau)), h * (0.08f + 0.06f * sin(a * tau + 1f)), w * (0.95f + 0.1f * sin(a * tau)), strength)
+        blob(colors[1], w * (0.95f + 0.15f * sin(b * tau + 2f)), h * (0.42f + 0.08f * sin(b * tau)), w * 0.9f, strength * 0.85f)
+        blob(colors[2], w * (0.3f + 0.15f * sin(c * tau + 4f)), h * (0.98f + 0.05f * sin(c * tau + 1f)), w * 0.9f, strength * 0.7f)
+        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.5f), Color.Black.copy(alpha = 0.8f))))
+    }
+}
+
+// ============================================================== shared
+
 @Composable
 private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
     val context = LocalContext.current
     val name = c.contact.name ?: Phone.format(context, c.number).ifBlank { "Unknown" }
-    val sub = buildList {
-        if (c.contact.name != null && c.number.isNotBlank()) add(Phone.format(context, c.number))
-        c.call.details?.accountHandle?.let { h ->
-            context.getSystemService(TelecomManager::class.java)?.callCapablePhoneAccounts?.let { list ->
-                if (list.size > 1) add("SIM ${list.indexOf(h) + 1}")
-            }
+    val sim = c.call.details?.accountHandle?.let { h ->
+        context.getSystemService(TelecomManager::class.java)?.callCapablePhoneAccounts?.let { list ->
+            if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null
         }
-    }.joinToString(" · ").uppercase()
-
-    if (c.ringing) Incoming(c, name, sub) else Ongoing(c, all, name, sub, audio)
+    }
+    if (c.ringing) Incoming(c, name, sim) else Ongoing(c, all, name, sim, audio)
 }
 
+/** Rounded-square avatar with an accent frame and a softly breathing outline. */
 @Composable
-private fun Brand(label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        ToggleMark()
-        Spacer(Modifier.width(10.dp))
-        Text(label, style = mono(12f, color = Bit.Accent, spacing = 1.6f))
+private fun SquircleAvatar(c: UiCall, size: Dp) {
+    val t = rememberInfiniteTransition(label = "breathe")
+    val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "p")
+    val r = size * 0.36f
+    Box(Modifier.size(size + 28.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(size + 28.dp).graphicsLayer { scaleX = 1f + 0.06f * p; scaleY = 1f + 0.06f * p; alpha = 0.45f + 0.45f * p }
+                .border(2.dp, Bit.Accent.copy(alpha = 0.6f), RoundedCornerShape(r + 14.dp)),
+        )
+        Box(Modifier.size(size).clip(RoundedCornerShape(r)).background(Bit.Accent).padding(5.dp).clip(RoundedCornerShape(r - 5.dp))) {
+            Avatar(listOf(c.contact), size - 10.dp, Modifier, square = true)
+        }
     }
 }
 
 @Composable
-private fun RingedAvatar(c: UiCall, size: Int) {
-    Box(Modifier.size(size.dp).clip(CircleShape).background(Bit.Accent), contentAlignment = Alignment.Center) {
-        Avatar(listOf(c.contact), (size - size / 14).dp, Modifier.border(4.dp, Bit.Black, CircleShape))
+private fun StatusTag(text: String, pulse: Boolean) {
+    val t = rememberInfiniteTransition(label = "dot")
+    val a by t.animateFloat(0.35f, 1f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "a")
+    Row(
+        Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.1f)).padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).graphicsLayer { alpha = if (pulse) a else 1f }.clip(CircleShape).background(Bit.Accent))
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = mono(11.5f, color = Color.White, spacing = 1.4f))
     }
 }
 
-// ------------------------------------------------------------- incoming
+private val GlassFill = Color.White.copy(alpha = 0.08f)
+private val GlassLine = Color.White.copy(alpha = 0.17f)
+
+// ============================================================ incoming
 
 @Composable
-private fun Incoming(c: UiCall, name: String, sub: String) {
+private fun Incoming(c: UiCall, name: String, sim: String?) {
     val context = LocalContext.current
     val view = LocalView.current
-    val pulse = rememberInfiniteTransition(label = "pulse")
-    val t by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1800), RepeatMode.Restart), label = "t")
-
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(20.dp))
-        Brand("INCOMING CALL")
-        Box(Modifier.fillMaxWidth().height(340.dp), contentAlignment = Alignment.Center) {
-            listOf(0f, 0.33f, 0.66f).forEach { phase ->
-                val p = (t + phase) % 1f
-                Box(
-                    Modifier.size((190 + 130 * p).dp).graphicsLayer { alpha = (1f - p) * 0.45f }
-                        .border(2.dp, Bit.Accent, CircleShape),
-                )
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp)) {
+        Column(Modifier.padding(horizontal = 8.dp)) {
+            Spacer(Modifier.height(18.dp))
+            StatusTag(listOfNotNull("INCOMING", sim).joinToString(" · "), pulse = true)
+            Spacer(Modifier.height(32.dp))
+            Box(Modifier.offset(x = (-14).dp)) { SquircleAvatar(c, 150.dp) }
+            Spacer(Modifier.height(20.dp))
+            Text(name, fontFamily = Display, fontWeight = FontWeight.Black, fontSize = if (name.length > 12) 40.sp else 56.sp, letterSpacing = (-2).sp, lineHeight = 58.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (c.contact.name != null && c.number.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text(Phone.format(context, c.number).uppercase(), style = mono(13f, color = Color.White.copy(alpha = 0.7f), spacing = 1f))
             }
-            RingedAvatar(c, 180)
-        }
-        Text(name, fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 38.sp, letterSpacing = (-1.3).sp, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp))
-        if (sub.isNotBlank()) {
-            Spacer(Modifier.height(10.dp))
-            Text(sub, style = mono(12f, spacing = 1f))
         }
         Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            SmallAction(Icons.AutoMirrored.Rounded.Message, "REPLY") {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            GlassPill(Icons.AutoMirrored.Rounded.Message, "REPLY", Modifier.weight(1f)) {
                 CallManager.decline(c)
                 if (c.number.isNotBlank()) {
                     context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }
-            SmallAction(Icons.Rounded.NotificationsOff, "SILENCE") { CallManager.silenceRinger(context) }
+            GlassPill(Icons.Rounded.NotificationsOff, "SILENCE", Modifier.weight(1f)) { CallManager.silenceRinger(context) }
         }
-        Spacer(Modifier.height(30.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                Modifier.size(72.dp).clip(CircleShape).background(Bit.Danger).clickable {
-                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                    CallManager.decline(c)
-                },
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.CallEnd, "Decline", tint = Color.White, modifier = Modifier.size(30.dp)) }
-            SlideToAnswer(Modifier.weight(1f)) {
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth().height(168.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.width(112.dp).fillMaxHeight().clip(RoundedCornerShape(34.dp)).background(Bit.Danger)
+                    .clickable {
+                        view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                        CallManager.decline(c)
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Rounded.CallEnd, "Decline", tint = Color.White, modifier = Modifier.size(34.dp))
+                Spacer(Modifier.height(12.dp))
+                Text("DECLINE", style = mono(11.5f, color = Color.White, spacing = 1.4f))
+            }
+            SlideUpToAnswer(Modifier.weight(1f).fillMaxHeight()) {
                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                 CallManager.answer(c)
             }
         }
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
     }
 }
 
 @Composable
-private fun SlideToAnswer(modifier: Modifier, onAnswer: () -> Unit) {
+private fun GlassPill(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier.height(64.dp).clip(RoundedCornerShape(22.dp)).background(GlassFill).border(1.5.dp, GlassLine, RoundedCornerShape(22.dp)).clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(label, style = mono(12f, color = Color.White, spacing = 1.2f))
+    }
+}
+
+@Composable
+private fun SlideUpToAnswer(modifier: Modifier, onAnswer: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val offset = remember { Animatable(0f) }
+    val drag = remember { Animatable(0f) } // 0 = resting at the bottom, grows upward
+    var dragging by remember { mutableStateOf(false) }
+    val bob = rememberInfiniteTransition(label = "bob")
+    val nudge by bob.animateFloat(0f, 1f, infiniteRepeatable(tween(800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "n")
     val density = LocalDensity.current
     BoxWithConstraints(
-        modifier.height(72.dp).clip(CircleShape).border(2.5.dp, Color.White, CircleShape)
+        modifier.clip(RoundedCornerShape(34.dp)).background(Color.Black.copy(alpha = 0.35f))
+            .border(2.5.dp, Color.White, RoundedCornerShape(34.dp))
             .semantics {
                 contentDescription = "Answer"
                 onClick { onAnswer(); true }
             },
     ) {
-        val knob = with(density) { 56.dp.toPx() }
-        val pad = with(density) { 8.dp.toPx() }
-        val max = with(density) { maxWidth.toPx() } - knob - pad * 2
-        Text(
-            "SLIDE TO ANSWER →",
-            style = mono(12f, color = Color.White, spacing = 1.6f),
-            modifier = Modifier.align(Alignment.Center).padding(start = 56.dp).graphicsLayer { alpha = 1f - (offset.value / max).coerceIn(0f, 1f) },
-        )
+        val knob = with(density) { 72.dp.toPx() }
+        val pad = with(density) { 10.dp.toPx() }
+        val max = with(density) { maxHeight.toPx() } - knob - pad * 2
+        val progress = (drag.value / max).coerceIn(0f, 1f)
+        Column(
+            Modifier.align(Alignment.TopCenter).padding(top = 16.dp).graphicsLayer { alpha = 1f - progress },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("↑", style = mono(13f, color = Color.White, spacing = 0f))
+            Text("SLIDE UP", style = mono(11.5f, color = Color.White, spacing = 1.6f))
+            Text("TO ANSWER", style = mono(11.5f, color = Color.White, spacing = 1.6f))
+        }
+        val bobPx = if (dragging || drag.value > 0f) 0f else with(density) { 8.dp.toPx() } * nudge
         Box(
-            Modifier.align(Alignment.CenterStart).padding(start = 8.dp)
-                .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .size(56.dp).clip(CircleShape).background(Bit.Accent)
+            Modifier.align(Alignment.BottomCenter).padding(10.dp)
+                .offset { IntOffset(0, -(drag.value + bobPx).roundToInt()) }
+                .fillMaxWidth().height(72.dp).clip(RoundedCornerShape(26.dp)).background(Bit.Accent)
                 .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { d -> scope.launch { offset.snapTo((offset.value + d).coerceIn(0f, max)) } },
+                    orientation = Orientation.Vertical,
+                    state = rememberDraggableState { d -> scope.launch { drag.snapTo((drag.value - d).coerceIn(0f, max)) } },
+                    onDragStarted = { dragging = true },
                     onDragStopped = {
-                        if (offset.value > max * 0.75f) {
-                            offset.animateTo(max)
+                        dragging = false
+                        if (drag.value > max * 0.7f) {
+                            drag.animateTo(max)
                             onAnswer()
                         } else {
-                            offset.animateTo(0f, Bit.bouncy)
+                            drag.animateTo(0f, Bit.bouncy)
                         }
                     },
                 ),
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Rounded.Phone, null, tint = Bit.OnAccent, modifier = Modifier.size(26.dp)) }
+        ) { Icon(Icons.Rounded.Phone, null, tint = Bit.OnAccent, modifier = Modifier.size(30.dp)) }
     }
 }
 
-@Composable
-private fun SmallAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier.size(56.dp).clip(CircleShape).background(Bit.Glass).border(1.5.dp, Bit.GlassEdge, CircleShape).clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(22.dp)) }
-        Spacer(Modifier.height(8.dp))
-        Text(label, style = mono(10.5f, spacing = 1f))
-    }
-}
-
-// --------------------------------------------------------------- ongoing
+// ============================================================= ongoing
 
 @Composable
-private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sub: String, audio: CallAudioState?) {
+private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, audio: CallAudioState?) {
     val context = LocalContext.current
     val view = LocalView.current
     var keypad by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(c.active) {
+    LaunchedEffect(Unit) {
         while (true) {
             now = System.currentTimeMillis()
             delay(500)
@@ -313,118 +384,136 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sub: String, aud
     val bt = route == CallAudioState.ROUTE_BLUETOOTH
     val others = all.filter { it !== c && !it.ended }
 
+    val timer = if (c.active && c.connectTime > 0) {
+        val s = ((now - c.connectTime) / 1000).coerceAtLeast(0)
+        if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%02d:%02d".format(s / 60, s % 60)
+    } else null
     val status = when {
         c.ended -> c.disconnectLabel?.uppercase()?.ifBlank { null } ?: "CALL ENDED"
         c.selectingSim -> "CHOOSE A SIM"
         c.dialing -> "CALLING…"
         c.holding -> "ON HOLD"
-        c.active && c.connectTime > 0 -> {
-            val s = ((now - c.connectTime) / 1000).coerceAtLeast(0)
-            if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%02d:%02d".format(s / 60, s % 60)
-        }
         else -> "CONNECTED"
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(20.dp))
-        Brand(if (c.ended) "CALL ENDED" else if (c.dialing) "CALLING" else "ON CALL")
-        Spacer(Modifier.height(if (keypad) 18.dp else 34.dp))
-        if (!keypad) RingedAvatar(c, 128)
-        Spacer(Modifier.height(16.dp))
-        Text(name, fontFamily = Display, fontWeight = FontWeight.Black, fontSize = if (keypad) 26.sp else 34.sp, letterSpacing = (-1.2).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp))
-        if (sub.isNotBlank() && !keypad) {
-            Spacer(Modifier.height(6.dp))
-            Text(sub, style = mono(11.5f, spacing = 1f))
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(status, style = mono(if (c.active) 28f else 15f, color = if (c.ended) Bit.Error else Bit.Accent, spacing = 2f))
-
-        others.firstOrNull()?.let { o ->
-            Spacer(Modifier.height(14.dp))
-            Row(
-                Modifier.clip(CircleShape).background(Bit.Glass).border(1.dp, Bit.GlassEdge, CircleShape).padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text((o.contact.name ?: Phone.format(context, o.number)), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Spacer(Modifier.width(8.dp))
-                Text(if (o.holding) "ON HOLD" else if (o.ringing) "WAITING" else "ACTIVE", style = mono(10.5f))
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.offset(x = (-10).dp)) { SquircleAvatar(c, 84.dp) }
+            Column(Modifier.weight(1f)) {
+                Text(name, fontFamily = Display, fontWeight = FontWeight.Black, fontSize = 32.sp, letterSpacing = (-1.2).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(6.dp))
+                Text(listOfNotNull(if (c.active) "HD" else null, sim).joinToString(" · ").ifBlank { Phone.format(context, c.number).uppercase() }, style = mono(11.5f, color = Color.White.copy(alpha = 0.7f), spacing = 1f))
             }
         }
 
-        if (c.selectingSim) {
-            Spacer(Modifier.height(30.dp))
-            val tm = context.getSystemService(TelecomManager::class.java)
-            tm?.callCapablePhoneAccounts.orEmpty().forEachIndexed { i, h ->
-                val label = tm?.getPhoneAccount(h)?.label?.toString() ?: "SIM ${i + 1}"
+        Column(Modifier.padding(horizontal = 8.dp)) {
+            Spacer(Modifier.height(if (keypad) 18.dp else 34.dp))
+            if (timer != null) {
+                Text(timer, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = if (keypad) 40.sp else 76.sp, letterSpacing = (-2).sp, lineHeight = 78.sp)
+                if (!keypad) {
+                    Spacer(Modifier.height(12.dp))
+                    VoiceBars(active = !muted && !c.holding)
+                }
+            } else {
+                Text(status, style = mono(if (keypad) 18f else 26f, color = if (c.ended) Bit.Error else Bit.Accent, spacing = 2f))
+            }
+            others.firstOrNull()?.let { o ->
+                Spacer(Modifier.height(14.dp))
                 Row(
-                    Modifier.padding(horizontal = 28.dp, vertical = 6.dp).fillMaxWidth().height(60.dp).clip(CircleShape)
-                        .border(2.dp, Bit.GlassEdge, CircleShape).clickable { CallManager.chooseSim(c, h) }.padding(horizontal = 22.dp),
+                    Modifier.clip(RoundedCornerShape(16.dp)).background(GlassFill).border(1.dp, GlassLine, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.SimCard, null, tint = Bit.Accent)
-                    Spacer(Modifier.width(12.dp))
-                    Text("SIM ${i + 1} · $label", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-            }
-        } else if (keypad) {
-            Spacer(Modifier.height(12.dp))
-            Text(typed.ifEmpty { " " }, fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, maxLines = 1)
-            Spacer(Modifier.height(10.dp))
-            DtmfPad { d ->
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                typed += d
-                CallManager.dtmf(c, d)
-            }
-        } else if (!c.ended) {
-            Spacer(Modifier.height(40.dp))
-            val controls = buildList {
-                add(Ctrl("MUTE", Icons.Rounded.MicOff, muted) { CallManager.setMuted(!muted) })
-                add(Ctrl("KEYPAD", Icons.Rounded.Dialpad, false) { keypad = true })
-                if (audio != null && audio.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH != 0) {
-                    add(Ctrl(if (bt) "BLUETOOTH" else if (speaker) "SPEAKER" else "AUDIO", if (bt) Icons.Rounded.Bluetooth else Icons.AutoMirrored.Rounded.VolumeUp, speaker || bt) {
-                        val next = when (route) {
-                            CallAudioState.ROUTE_BLUETOOTH -> CallAudioState.ROUTE_SPEAKER
-                            CallAudioState.ROUTE_SPEAKER -> CallAudioState.ROUTE_WIRED_OR_EARPIECE
-                            else -> CallAudioState.ROUTE_BLUETOOTH
-                        }
-                        CallManager.service?.setAudioRoute(next)
-                    })
-                } else {
-                    add(Ctrl("SPEAKER", Icons.AutoMirrored.Rounded.VolumeUp, speaker) { CallManager.setSpeaker(!speaker) })
-                }
-                add(Ctrl("ADD CALL", Icons.Rounded.Add, false) {
-                    context.startActivity(Intent(Intent.ACTION_DIAL).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                })
-                if (others.any { it.holding } && c.active) {
-                    add(Ctrl("MERGE", Icons.Rounded.CallMerge, false) { CallManager.merge(all) })
-                    add(Ctrl("SWAP", Icons.Rounded.SwapCalls, false) { CallManager.swap(all) })
-                } else {
-                    add(Ctrl("HOLD", Icons.Rounded.Pause, c.holding) { CallManager.toggleHold(c) })
-                    add(Ctrl("MESSAGE", Icons.AutoMirrored.Rounded.Message, false) {
-                        if (c.number.isNotBlank()) {
-                            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        }
-                    })
-                }
-            }
-            controls.chunked(3).forEach { row ->
-                Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    row.forEach { ControlButton(it) }
+                    Text(o.contact.name ?: Phone.format(context, o.number), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (o.holding) "ON HOLD" else if (o.ringing) "WAITING" else "ACTIVE", style = mono(10.5f))
                 }
             }
         }
 
         Spacer(Modifier.weight(1f))
-        if (keypad) {
-            Text(
-                "HIDE KEYPAD", style = mono(12f, color = Color.White, spacing = 1.4f),
-                modifier = Modifier.clip(CircleShape).clickable { keypad = false }.padding(horizontal = 18.dp, vertical = 12.dp),
-            )
-            Spacer(Modifier.height(10.dp))
+
+        when {
+            c.selectingSim -> {
+                val tm = context.getSystemService(TelecomManager::class.java)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    tm?.callCapablePhoneAccounts.orEmpty().forEachIndexed { i, h ->
+                        val label = tm?.getPhoneAccount(h)?.label?.toString() ?: "SIM ${i + 1}"
+                        Tile(Icons.Rounded.SimCard, "SIM ${i + 1}", label.uppercase(), false, Modifier.fillMaxWidth().height(80.dp)) { CallManager.chooseSim(c, h) }
+                    }
+                }
+            }
+            keypad -> {
+                Text(typed.ifEmpty { " " }, fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, maxLines = 1, modifier = Modifier.padding(horizontal = 8.dp))
+                Spacer(Modifier.height(10.dp))
+                listOf("123", "456", "789", "*0#").forEach { row ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { d ->
+                            Box(
+                                Modifier.weight(1f).height(62.dp).clip(RoundedCornerShape(22.dp)).background(GlassFill).border(1.5.dp, GlassLine, RoundedCornerShape(22.dp))
+                                    .clickable {
+                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                        typed += d
+                                        CallManager.dtmf(c, d)
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) { Text("$d", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 26.sp) }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Tile(Icons.Rounded.Dialpad, "HIDE KEYPAD", null, false, Modifier.fillMaxWidth().height(60.dp)) { keypad = false }
+            }
+            !c.ended -> {
+                val tiles = buildList {
+                    add(TileSpec("MUTE", Icons.Rounded.MicOff, muted, if (muted) "ON" else "OFF") { CallManager.setMuted(!muted) })
+                    if (audio != null && audio.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH != 0) {
+                        add(TileSpec(if (bt) "BLUETOOTH" else "AUDIO", if (bt) Icons.Rounded.Bluetooth else Icons.AutoMirrored.Rounded.VolumeUp, speaker || bt, if (bt) "ON" else if (speaker) "SPEAKER" else "PHONE") {
+                            CallManager.service?.setAudioRoute(
+                                when (route) {
+                                    CallAudioState.ROUTE_BLUETOOTH -> CallAudioState.ROUTE_SPEAKER
+                                    CallAudioState.ROUTE_SPEAKER -> CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                                    else -> CallAudioState.ROUTE_BLUETOOTH
+                                },
+                            )
+                        })
+                    } else {
+                        add(TileSpec("SPEAKER", Icons.AutoMirrored.Rounded.VolumeUp, speaker, if (speaker) "ON" else "OFF") { CallManager.setSpeaker(!speaker) })
+                    }
+                    add(TileSpec("KEYPAD", Icons.Rounded.Dialpad, false, null) { keypad = true })
+                    if (others.any { it.holding } && c.active) {
+                        add(TileSpec("MERGE", Icons.Rounded.CallMerge, false, null) { CallManager.merge(all) })
+                        add(TileSpec("SWAP", Icons.Rounded.SwapCalls, false, null) { CallManager.swap(all) })
+                    } else {
+                        add(TileSpec("HOLD", Icons.Rounded.Pause, c.holding, if (c.holding) "ON" else null) { CallManager.toggleHold(c) })
+                        add(TileSpec("ADD CALL", Icons.Rounded.Add, false, null) {
+                            context.startActivity(Intent(Intent.ACTION_DIAL).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        })
+                    }
+                    add(TileSpec("MESSAGE", Icons.AutoMirrored.Rounded.Message, false, null) {
+                        if (c.number.isNotBlank()) {
+                            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    })
+                }
+                tiles.chunked(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { s ->
+                            Tile(s.icon, s.label, s.state, s.on, Modifier.weight(1f).height(96.dp)) {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                s.onClick()
+                            }
+                        }
+                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
         }
+
+        Spacer(Modifier.height(12.dp))
         if (!c.ended) {
             Row(
-                Modifier.padding(horizontal = 24.dp).fillMaxWidth().height(72.dp).clip(CircleShape).background(Bit.Danger)
+                Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(30.dp)).background(Bit.Danger)
                     .clickable {
                         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                         CallManager.hangup(c)
@@ -432,48 +521,47 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sub: String, aud
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(12.dp))
+                Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(14.dp))
                 Text("END CALL", style = mono(13f, color = Color.White, spacing = 1.6f))
             }
         }
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
     }
 }
 
-private data class Ctrl(val label: String, val icon: ImageVector, val on: Boolean, val onClick: () -> Unit)
+private data class TileSpec(val label: String, val icon: ImageVector, val on: Boolean, val state: String?, val onClick: () -> Unit)
 
 @Composable
-private fun ControlButton(c: Ctrl) {
-    val view = LocalView.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(96.dp)) {
-        Box(
-            Modifier.size(78.dp).clip(CircleShape)
-                .then(if (c.on) Modifier.background(Bit.Accent) else Modifier.background(Bit.Glass).border(1.5.dp, Bit.GlassEdge, CircleShape))
-                .clickable {
-                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    c.onClick()
-                },
-            contentAlignment = Alignment.Center,
-        ) { Icon(c.icon, c.label, tint = if (c.on) Bit.OnAccent else Color.White, modifier = Modifier.size(26.dp)) }
-        Spacer(Modifier.height(9.dp))
-        Text(c.label, style = mono(10.5f, color = if (c.on) Bit.Accent else Bit.TextDim, spacing = 1f))
+private fun Tile(icon: ImageVector, label: String, state: String?, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(26.dp)
+    val fg = if (on) Bit.OnAccent else Color.White
+    Column(
+        modifier.clip(shape)
+            .then(if (on) Modifier.background(Bit.Accent) else Modifier.background(GlassFill).border(1.5.dp, GlassLine, shape))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Icon(icon, label, tint = fg, modifier = Modifier.size(24.dp))
+        Column {
+            Text(label, style = mono(11f, color = fg, spacing = 1.1f), maxLines = 1)
+            if (state != null) Text(state, style = mono(10f, color = fg.copy(alpha = 0.7f), spacing = 1f))
+        }
     }
 }
 
+/** A little animated level meter under the timer (decorative; flat while muted or on hold). */
 @Composable
-private fun DtmfPad(onDigit: (Char) -> Unit) {
-    val keys = listOf("123", "456", "789", "*0#")
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        keys.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                row.forEach { d ->
-                    Box(
-                        Modifier.size(72.dp).clip(CircleShape).background(Bit.Glass).border(1.5.dp, Bit.GlassEdge, CircleShape).clickable { onDigit(d) },
-                        contentAlignment = Alignment.Center,
-                    ) { Text("$d", fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 28.sp) }
-                }
-            }
+private fun VoiceBars(active: Boolean) {
+    val t = rememberInfiniteTransition(label = "bars")
+    val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "p")
+    val tau = (2 * Math.PI).toFloat()
+    Row(Modifier.height(26.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.Bottom) {
+        repeat(16) { i ->
+            val wave = if (active) 0.5f + 0.5f * sin(p * tau * 2 + i * 0.7f) * sin(p * tau + i * 1.3f) else 0f
+            val h = 6f + 20f * kotlin.math.abs(wave)
+            Box(Modifier.width(6.dp).height(h.dp).clip(RoundedCornerShape(3.dp)).background(Bit.Accent.copy(alpha = 0.35f + 0.6f * (h / 26f))))
         }
     }
 }
