@@ -174,6 +174,7 @@ class InCallActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (CallManager.calls.value.none { it.ringing }) CallVibrator.stop(this)
         setProximity(false)
         super.onDestroy()
     }

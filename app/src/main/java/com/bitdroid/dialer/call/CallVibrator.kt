@@ -18,8 +18,16 @@ import com.bitdroid.dialer.data.Prefs
 object CallVibrator {
     private var running = false
 
-    private fun vibrator(context: Context): Vibrator? =
-        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    /**
+     * Android only cancels a vibration through the same Vibrator that started it, so keep one
+     * instance from the application context and use it for both start and stop.
+     */
+    private var shared: Vibrator? = null
+
+    private fun vibrator(context: Context): Vibrator? {
+        shared?.let { return it }
+        return context.applicationContext.getSystemService(VibratorManager::class.java)?.defaultVibrator?.also { shared = it }
+    }
 
     fun start(context: Context) {
         if (running) return
@@ -60,10 +68,10 @@ object CallVibrator {
         }
     }
 
+    /** Safe to call any time; always cancels, even if we lost track of the running state. */
     fun stop(context: Context) {
-        if (!running) return
         vibrator(context)?.cancel()
+        if (running) Diag.log(context, "ring vibration stopped")
         running = false
-        Diag.log(context, "ring vibration stopped")
     }
 }
