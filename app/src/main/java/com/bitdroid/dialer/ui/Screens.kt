@@ -643,7 +643,7 @@ fun SettingsScreen(vm: DialerViewModel) {
             item { SectionRule("CALL DIAGNOSTICS") }
             item { CallDiagnostics() }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.6") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.7") {} }
         }
     }
 }

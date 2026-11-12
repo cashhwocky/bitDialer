@@ -94,9 +94,15 @@ object CallNotifier {
             .build()
         com.bitdroid.dialer.call.Diag.log(context, "test call posted (notifications: ${canPost(context)}, full-screen allowed: ${fullScreenAllowed(context)})")
         post(context, n, TEST_ID)
+        // Vibrate like a real call so vibration can be checked too; stop after 30 s if untouched.
+        CallVibrator.start(context)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ CallVibrator.stop(context) }, 30_000)
     }
 
-    fun cancelTest(context: Context) = NotificationManagerCompat.from(context).cancel(TEST_ID)
+    fun cancelTest(context: Context) {
+        CallVibrator.stop(context)
+        NotificationManagerCompat.from(context).cancel(TEST_ID)
+    }
 
     /** Builds the call notification for the current calls, or null when there's nothing live. */
     fun build(context: Context, calls: List<UiCall>): Notification? {

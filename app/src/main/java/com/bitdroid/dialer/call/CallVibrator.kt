@@ -23,15 +23,27 @@ object CallVibrator {
 
     fun start(context: Context) {
         if (running) return
-        if (!Prefs.vibrateCalls(context)) return
+        if (!Prefs.vibrateCalls(context)) {
+            Diag.log(context, "ring vibration skipped: turned off in Settings")
+            return
+        }
         val am = context.getSystemService(AudioManager::class.java)
-        if (am?.ringerMode == AudioManager.RINGER_MODE_SILENT) return
+        if (am?.ringerMode == AudioManager.RINGER_MODE_SILENT) {
+            Diag.log(context, "ring vibration skipped: phone is on Silent")
+            return
+        }
         // Respect Do Not Disturb.
         val nm = context.getSystemService(NotificationManager::class.java)
         val filter = nm?.currentInterruptionFilter ?: NotificationManager.INTERRUPTION_FILTER_ALL
-        if (filter != NotificationManager.INTERRUPTION_FILTER_ALL && filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN) return
-        val v = vibrator(context) ?: return
-        if (!v.hasVibrator()) return
+        if (filter != NotificationManager.INTERRUPTION_FILTER_ALL && filter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN) {
+            Diag.log(context, "ring vibration skipped: Do Not Disturb is on")
+            return
+        }
+        val v = vibrator(context)
+        if (v == null || !v.hasVibrator()) {
+            Diag.log(context, "ring vibration skipped: no vibrator")
+            return
+        }
         // Ring pattern: 1 s on, 1 s off, repeating from index 1.
         val effect = VibrationEffect.createWaveform(longArrayOf(0, 1000, 1000), 1)
         try {
