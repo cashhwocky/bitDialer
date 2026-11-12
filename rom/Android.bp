@@ -1,0 +1,25 @@
+// Drop this folder into your bitDroid tree (e.g. packages/apps/bitDialer/)
+// together with bitDialer.apk from the latest GitHub release, then add
+//   PRODUCT_PACKAGES += bitDialer
+// to your product makefile. `overrides` removes the AOSP/Lineage Dialer, the
+// overlay in overlay/config.xml makes bitDialer the default phone app on first
+// boot, and the default-permissions file grants its permissions up front.
+
+android_app_import {
+    name: "bitDialer",
+    apk: "bitDialer.apk",
+    presigned: true,
+    product_specific: true,
+    dex_preopt: {
+        enabled: true,
+    },
+    overrides: ["Dialer"],
+    required: ["default-permissions-bitdialer.xml"],
+}
+
+prebuilt_etc {
+    name: "default-permissions-bitdialer.xml",
+    src: "permissions/default-permissions-bitdialer.xml",
+    sub_dir: "default-permissions",
+    product_specific: true,
+}

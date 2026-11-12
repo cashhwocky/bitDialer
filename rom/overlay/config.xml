@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Add to your device/vendor overlay of frameworks/base/core/res/res/values/config.xml
+     so bitDialer holds ROLE_DIALER on first boot. -->
+<resources>
+    <string name="config_defaultDialer" translatable="false">com.bitdroid.dialer</string>
+</resources>
