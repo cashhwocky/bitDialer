@@ -34,7 +34,13 @@ open class CallService : InCallService() {
         Log.i("bitDialer", "call added, state=${call.details?.state}")
         call.registerCallback(callback)
         sync()
-        if (call.details?.state != Call.STATE_RINGING) openScreen()
+        if (call.details?.state != Call.STATE_RINGING) {
+            openScreen()
+        } else if (deviceLockedOrOff()) {
+            // Ringing on a locked or sleeping phone: go straight to the full-screen call screen
+            // (the full-screen notification does this too; this is a backup if it's blocked).
+            openScreen()
+        }
     }
 
     override fun onCallRemoved(call: Call) {
@@ -68,6 +74,12 @@ open class CallService : InCallService() {
             Log.e("bitDialer", "startForeground failed, posting plain notification", e)
             CallNotifier.buildPlain(this, list)?.let { CallNotifier.post(this, it) }
         }
+    }
+
+    private fun deviceLockedOrOff(): Boolean {
+        val km = getSystemService(android.app.KeyguardManager::class.java)
+        val pm = getSystemService(android.os.PowerManager::class.java)
+        return km?.isKeyguardLocked == true || pm?.isInteractive == false
     }
 
     private fun openScreen() {

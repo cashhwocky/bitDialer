@@ -113,6 +113,53 @@ fun openCallScreen(context: android.content.Context) {
     )
 }
 
+/** True when Android lets bitDialer show incoming calls full screen over the lock screen. */
+fun canShowFullScreenCalls(context: android.content.Context): Boolean =
+    android.os.Build.VERSION.SDK_INT < 34 ||
+        context.getSystemService(android.app.NotificationManager::class.java)?.canUseFullScreenIntent() == true
+
+/** Warns when incoming calls can't show full screen, with a button straight to the setting. */
+@Composable
+fun FullScreenCallsWarning() {
+    val context = LocalContext.current
+    var allowed by remember { mutableStateOf(canShowFullScreenCalls(context)) }
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) allowed = canShowFullScreenCalls(context)
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    if (allowed) return
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(24.dp)).border(2.dp, Bit.Missed, RoundedCornerShape(24.dp)).padding(16.dp),
+    ) {
+        Text("INCOMING CALLS WON'T SHOW FULL SCREEN", style = mono(11f, color = Bit.Missed, spacing = 1.2f))
+        Spacer(Modifier.height(6.dp))
+        Text("Allow full-screen notifications so calls appear over your lock screen.", fontSize = 14.sp, lineHeight = 19.sp)
+        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier.height(44.dp).clip(CircleShape).background(Bit.Accent).clickable {
+                val i = if (android.os.Build.VERSION.SDK_INT >= 34) {
+                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.fromParts("package", context.packageName, null))
+                } else {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                }
+                try {
+                    context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } catch (_: Exception) {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }.padding(horizontal = 18.dp),
+            contentAlignment = Alignment.Center,
+        ) { Text("Allow", color = Bit.OnAccent, fontWeight = FontWeight.Bold) }
+    }
+}
+
 /** Shown at the top of the app while a call is live: tap to go back to it. */
 @Composable
 fun ReturnToCallBar() {
@@ -205,6 +252,7 @@ fun CallsScreen(vm: DialerViewModel) {
                 }
             }
 
+            item(key = "fsi") { FullScreenCallsWarning() }
             if (query.isNotBlank()) {
                 item(key = "rh") { SectionRule("CONTACTS") }
                 items(results, key = { "r" + it.name + it.number }) { r ->
@@ -586,7 +634,7 @@ fun SettingsScreen(vm: DialerViewModel) {
                 }
             }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.2") {} }
+            item { Row2("bitDialer", "Phone app for bitDroid · v0.2.3") {} }
         }
     }
 }
