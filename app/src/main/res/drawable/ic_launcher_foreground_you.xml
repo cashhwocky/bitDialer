@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material You style icon, matching bitMessages' two-bubble icon: a call bubble in front of a purple one. -->
+<!-- Material You style icon: big handset with ring waves and a pink dot, matching bitMessages' bubbles icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <group android:scaleX="0.66" android:scaleY="0.66" android:pivotX="54" android:pivotY="54">
-        <path android:fillColor="#7B6CC4"
-            android:pathData="M44,22h36a12,12 0,0 1,12 12v16a12,12 0,0 1,-12 12h-2v9c0,2 -2.4,3 -4,1.6L64,62H44a12,12 0,0 1,-12 -12V34a12,12 0,0 1,12 -12z" />
-        <path android:fillColor="#2B2557"
-            android:pathData="M28,44h34a12,12 0,0 1,12 12v16a12,12 0,0 1,-12 12H44l-11,9.6c-1.6,1.4 -4,0.4 -4,-1.6V84h-1a12,12 0,0 1,-12 -12V56a12,12 0,0 1,12 -12z" />
-        <group android:translateX="30.6" android:translateY="50.6" android:scaleX="1.15" android:scaleY="1.15">
-            <path android:fillColor="#DCD4F6"
+        <group android:translateX="14" android:translateY="18" android:scaleX="3.2" android:scaleY="3.2">
+            <path android:fillColor="#2B2557"
                 android:pathData="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z" />
         </group>
-        <path android:fillColor="#E57FB0" android:pathData="M63,55m-4.2,0a4.2,4.2 0,1 1,8.4 0a4.2,4.2 0,1 1,-8.4 0" />
+        <path android:strokeColor="#7B6CC4" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M64,26a22,22 0,0 1,20 20" />
+        <path android:strokeColor="#7B6CC4" android:strokeWidth="7" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M63,40a9,9 0,0 1,8 8" />
+        <path android:fillColor="#E57FB0" android:pathData="M84,24m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
     </group>
 </vector>
