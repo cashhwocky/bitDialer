@@ -4,19 +4,19 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 
-/** Launcher icon choices; each is an activity-alias in the manifest. White is the default. */
+/** Launcher icon choices; each is an activity-alias in the manifest. The Material You icon is the default. */
 object AppIcons {
     data class Choice(val key: String, val label: String, val alias: String, val bg: Long, val darkMark: Boolean, val art: Int? = null)
 
     val all = listOf(
+        Choice("you", "RING", ".IconYou", 0xFFDCD4F6, true, com.bitdroid.dialer.R.drawable.ic_launcher_foreground_you),
         Choice("white", "WHITE", ".IconWhite", 0xFFFFFFFF, true),
         Choice("black", "AMOLED", ".IconBlack", 0xFF000000, false),
         Choice("blue", "BLUE", ".IconBlue", 0xFFA8C7FA, true),
         Choice("lilac", "LILAC", ".IconLilac", 0xFFEADDFF, true),
-        Choice("you", "BUBBLES", ".IconYou", 0xFFDCD4F6, true, com.bitdroid.dialer.R.drawable.ic_launcher_foreground_you),
     )
 
-    fun current(context: Context): String = Prefs.get(context).getString("app_icon", "white") ?: "white"
+    fun current(context: Context): String = Prefs.get(context).getString("app_icon", "you") ?: "you"
 
     fun set(context: Context, key: String) {
         val chosen = all.firstOrNull { it.key == key } ?: return
