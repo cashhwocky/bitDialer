@@ -18,8 +18,8 @@ android {
         applicationId = "com.bitdroid.dialer"
         minSdk = 31
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.4.0"
+        versionCode = 13
+        versionName = "0.4.1"
     }
 
     signingConfigs {
