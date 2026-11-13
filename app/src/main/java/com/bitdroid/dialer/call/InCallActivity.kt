@@ -143,17 +143,130 @@ class InCallActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize().backdrop()) {
                     MovingGradient(useMonet = Prefs.monetBackground(this@InCallActivity), intense = primary?.ringing == true)
                     if (testMode && primary == null) {
-                        Incoming(
-                            contact = com.bitdroid.dialer.data.Contact("", "Test call", null, null),
-                            number = "", name = "Test call", sim = "TEST",
-                            onAnswer = { Diag.log(this@InCallActivity, "test call answered"); CallNotifier.cancelTest(this@InCallActivity); finishAndRemoveTask() },
-                            onDecline = { Diag.log(this@InCallActivity, "test call declined"); CallNotifier.cancelTest(this@InCallActivity); finishAndRemoveTask() },
-                        )
+                        TestCall()
                     } else if (primary != null) {
                         CallScreen(primary, calls, audio)
                     }
                 }
             }
+        }
+    }
+
+    // ------------------------------------------------------------ test call
+
+    private var tts: android.speech.tts.TextToSpeech? = null
+    private var ttsReady = false
+    private var voiceOn = false
+
+    private val testLines = listOf(
+        "Hey! You actually picked up. This is your test call from bit Dialer.",
+        "Nobody is really here. It's just me, a very convincing robot, living inside your phone.",
+        "Go ahead, try the buttons. Mute me, put me on hold, open the keypad. I promise I won't be offended.",
+        "Fun fact. This whole screen is styled like your home screen. The timer is the clock, and I'm the battery squiggle.",
+        "Okay, I'll keep rambling until you hang up. It's the pink button at the bottom. You know the one.",
+    )
+
+    private fun startVoice() {
+        voiceOn = true
+        val engine = tts
+        if (engine == null) {
+            tts = android.speech.tts.TextToSpeech(this) { status ->
+                ttsReady = status == android.speech.tts.TextToSpeech.SUCCESS
+                if (ttsReady && voiceOn) speakAll()
+            }.also { t ->
+                t.setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build(),
+                )
+                t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                    override fun onStart(id: String?) {}
+                    override fun onError(id: String?) {}
+                    override fun onDone(id: String?) {
+                        // Loop the script for as long as the test call is up.
+                        if (id == "last" && voiceOn) runOnUiThread { if (voiceOn) speakAll() }
+                    }
+                })
+            }
+        } else if (ttsReady) {
+            speakAll()
+        }
+    }
+
+    private fun speakAll() {
+        val t = tts ?: return
+        testLines.forEachIndexed { i, line ->
+            t.speak(line, android.speech.tts.TextToSpeech.QUEUE_ADD, null, if (i == testLines.lastIndex) "last" else "l$i")
+            t.playSilentUtterance(900, android.speech.tts.TextToSpeech.QUEUE_ADD, "gap$i")
+        }
+    }
+
+    private fun stopVoice() {
+        voiceOn = false
+        tts?.stop()
+    }
+
+    @Composable
+    private fun TestCall() {
+        var answered by remember { mutableStateOf(false) }
+        var answeredAt by remember { mutableLongStateOf(0L) }
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        var muted by remember { mutableStateOf(false) }
+        var speaker by remember { mutableStateOf(true) }
+        var holding by remember { mutableStateOf(false) }
+        val contact = com.bitdroid.dialer.data.Contact("", "Test call", null, null)
+        LaunchedEffect(answered) {
+            while (answered) {
+                now = System.currentTimeMillis()
+                delay(500)
+            }
+        }
+        fun end() {
+            stopVoice()
+            Diag.log(this@InCallActivity, "test call ended")
+            CallNotifier.cancelTest(this@InCallActivity)
+            finishAndRemoveTask()
+        }
+        if (!answered) {
+            val answer = {
+                Diag.log(this@InCallActivity, "test call answered")
+                CallNotifier.cancelTest(this@InCallActivity)
+                answered = true
+                answeredAt = System.currentTimeMillis()
+                now = answeredAt
+                startVoice()
+            }
+            if (Bit.expressive) {
+                BloomIncoming(
+                    contact = contact, number = "", name = "Test call", sim = "TEST", subtitle = "Answer to try the call screen",
+                    onAnswer = answer, onDecline = { end() }, onMessage = { end() },
+                    onSilence = { CallVibrator.stop(this@InCallActivity) },
+                )
+            } else {
+                Incoming(contact = contact, number = "", name = "Test call", sim = "TEST", onAnswer = answer, onDecline = { end() })
+            }
+        } else {
+            BloomOngoing(
+                BloomCallState(
+                    name = "Test call", number = "bitDialer robot", contact = contact, sim = "TEST",
+                    timer = bloomClock(now - answeredAt), status = "Connected", active = true, ended = false,
+                    muted = muted, speaker = speaker, bluetooth = false, holding = holding, canMerge = false,
+                ),
+                BloomCallActions(
+                    onMute = { muted = !muted },
+                    onAudio = { speaker = !speaker },
+                    onHold = {
+                        holding = !holding
+                        if (holding) stopVoice() else startVoice()
+                    },
+                    onAdd = {},
+                    onSwap = {},
+                    onMerge = {},
+                    onMessage = {},
+                    onDigit = {},
+                    onHangup = { end() },
+                ),
+            )
         }
     }
 
@@ -180,6 +293,9 @@ class InCallActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        stopVoice()
+        tts?.shutdown()
+        tts = null
         if (CallManager.calls.value.none { it.ringing }) CallVibrator.stop(this)
         setProximity(false)
         super.onDestroy()
@@ -241,14 +357,106 @@ private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
         phoneAccounts(context).let { list -> if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null }
     }
     if (c.ringing) {
-        Incoming(
-            contact = c.contact, number = c.number, name = name, sim = sim,
-            onAnswer = { CallManager.answer(c) },
-            onDecline = { CallManager.decline(c) },
-        )
+        if (Bit.expressive) {
+            BloomIncoming(
+                contact = c.contact, number = c.number, name = name, sim = sim,
+                subtitle = if (c.contact.name != null) Phone.format(context, c.number) else "Unknown caller",
+                onAnswer = { CallManager.answer(c) },
+                onDecline = { CallManager.decline(c) },
+                onMessage = {
+                    CallManager.decline(c)
+                    if (c.number.isNotBlank()) {
+                        context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                },
+                onSilence = { CallManager.silenceRinger(context) },
+            )
+        } else {
+            Incoming(
+                contact = c.contact, number = c.number, name = name, sim = sim,
+                onAnswer = { CallManager.answer(c) },
+                onDecline = { CallManager.decline(c) },
+            )
+        }
+    } else if (Bit.expressive) {
+        BloomOngoingFor(c, all, name, sim, audio)
     } else {
         Ongoing(c, all, name, sim, audio)
     }
+}
+
+/** Feeds a real call into the Bloom call screen. */
+@Composable
+private fun BloomOngoingFor(c: UiCall, all: List<UiCall>, name: String, sim: String?, audio: CallAudioState?) {
+    val context = LocalContext.current
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(500)
+        }
+    }
+    val route = audio?.route ?: CallAudioState.ROUTE_EARPIECE
+    val hasBt = audio != null && audio.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH != 0
+    val others = all.filter { it !== c && !it.ended }
+    val timer = if (c.active && c.connectTime > 0) bloomClock(now - c.connectTime) else null
+    val status = when {
+        c.ended -> c.disconnectLabel?.ifBlank { null } ?: "Call ended"
+        c.selectingSim -> "Choose a SIM"
+        c.dialing -> "Calling…"
+        c.holding -> "On hold"
+        else -> "Connected"
+    }
+    val tm = context.getSystemService(TelecomManager::class.java)
+    val state = BloomCallState(
+        name = name,
+        number = if (c.contact.name != null) Phone.format(context, c.number) else "",
+        contact = c.contact, sim = sim, timer = timer, status = status,
+        active = c.active, ended = c.ended, muted = audio?.isMuted == true,
+        speaker = route == CallAudioState.ROUTE_SPEAKER, bluetooth = route == CallAudioState.ROUTE_BLUETOOTH,
+        holding = c.holding, canMerge = others.any { it.holding } && c.active,
+        other = others.firstOrNull()?.let { o -> (o.contact.name ?: Phone.format(context, o.number)) + " · " + if (o.holding) "on hold" else if (o.ringing) "waiting" else "active" },
+        simChoices = if (c.selectingSim) phoneAccounts(context).mapIndexed { i, h ->
+            val label = runCatching { tm?.getPhoneAccount(h)?.label?.toString() }.getOrNull() ?: "SIM ${i + 1}"
+            "SIM ${i + 1} · $label" to { CallManager.chooseSim(c, h) }
+        } else emptyList(),
+    )
+    BloomOngoing(
+        state,
+        BloomCallActions(
+            onMute = { CallManager.setMuted(audio?.isMuted != true) },
+            onAudio = {
+                if (hasBt) {
+                    CallManager.service?.setAudioRoute(
+                        when (route) {
+                            CallAudioState.ROUTE_BLUETOOTH -> CallAudioState.ROUTE_SPEAKER
+                            CallAudioState.ROUTE_SPEAKER -> CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                            else -> CallAudioState.ROUTE_BLUETOOTH
+                        },
+                    )
+                } else {
+                    CallManager.setSpeaker(route != CallAudioState.ROUTE_SPEAKER)
+                }
+            },
+            onHold = { CallManager.toggleHold(c) },
+            onAdd = { context.startActivity(Intent(Intent.ACTION_DIAL).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+            onSwap = { CallManager.swap(all) },
+            onMerge = { CallManager.merge(all) },
+            onMessage = {
+                if (c.number.isNotBlank()) {
+                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            },
+            onDigit = { CallManager.dtmf(c, it) },
+            onHangup = { CallManager.hangup(c) },
+        ),
+    )
+}
+
+/** "4:12", or "1:02:03" past an hour. */
+internal fun bloomClock(ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0)
+    return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
 
 /** Rounded-square avatar with an accent frame and a softly breathing outline. */
