@@ -1,5 +1,10 @@
 package com.bitdroid.dialer.call
 
+import com.bitdroid.dialer.ui.Body
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import com.bitdroid.dialer.ui.backdrop
+import com.bitdroid.dialer.ui.Shapes
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -135,7 +140,7 @@ class InCallActivity : ComponentActivity() {
                 }
                 val earpiece = audio == null || audio!!.route == CallAudioState.ROUTE_EARPIECE
                 LaunchedEffect(primary?.active, earpiece) { setProximity(primary?.active == true && earpiece) }
-                Box(Modifier.fillMaxSize().background(Bit.Black)) {
+                Box(Modifier.fillMaxSize().backdrop()) {
                     MovingGradient(useMonet = Prefs.monetBackground(this@InCallActivity), intense = primary?.ringing == true)
                     if (testMode && primary == null) {
                         Incoming(
@@ -188,7 +193,9 @@ class InCallActivity : ComponentActivity() {
 private fun MovingGradient(useMonet: Boolean, intense: Boolean) {
     val context = LocalContext.current
     val colors = remember(useMonet) {
-        if (useMonet) {
+        if (Bit.expressive) {
+            listOf(Color(0xFF8C6EF0), Color(0xFFF28FB5), Color(0xFF2B9C9C))
+        } else if (useMonet) {
             val d = dynamicDarkColorScheme(context)
             listOf(d.primary, d.tertiary, d.secondary)
         } else {
@@ -213,7 +220,8 @@ private fun MovingGradient(useMonet: Boolean, intense: Boolean) {
         blob(colors[0], w * (0.15f + 0.18f * sin(a * tau)), h * (0.08f + 0.06f * sin(a * tau + 1f)), w * (0.95f + 0.1f * sin(a * tau)), strength)
         blob(colors[1], w * (0.95f + 0.15f * sin(b * tau + 2f)), h * (0.42f + 0.08f * sin(b * tau)), w * 0.9f, strength * 0.85f)
         blob(colors[2], w * (0.3f + 0.15f * sin(c * tau + 4f)), h * (0.98f + 0.05f * sin(c * tau + 1f)), w * 0.9f, strength * 0.7f)
-        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.5f), Color.Black.copy(alpha = 0.8f))))
+        if (Bit.expressive) drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF120F1C).copy(alpha = 0.45f), Color(0xFF0F1419).copy(alpha = 0.7f))))
+        else drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.5f), Color.Black.copy(alpha = 0.8f))))
     }
 }
 
@@ -449,7 +457,11 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, au
         else -> "CONNECTED"
     }
 
+    val ex = Bit.expressive
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp)) {
+        if (ex) {
+            HomeCallHeader(c, name, sim, timer, status, keypad)
+        } else {
         Spacer(Modifier.height(18.dp))
         Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.offset(x = (-10).dp)) { SquircleAvatar(c, 84.dp) }
@@ -471,6 +483,9 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, au
             } else {
                 Text(status, style = mono(if (keypad) 18f else 26f, color = if (c.ended) Bit.Error else Bit.Accent, spacing = 2f))
             }
+        }
+        }
+        Column(Modifier.padding(horizontal = 8.dp).align(if (ex) Alignment.CenterHorizontally else Alignment.Start)) {
             others.firstOrNull()?.let { o ->
                 Spacer(Modifier.height(14.dp))
                 Row(
@@ -549,9 +564,13 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, au
                         }
                     })
                 }
-                tiles.chunked(3).forEach { row ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        row.forEach { s ->
+                tiles.chunked(3).forEachIndexed { r, row ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = if (ex) 8.dp else 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEachIndexed { i, s ->
+                            if (ex) ShapeTile(s.icon, s.label, s.on, controlShapes[(r * 3 + i) % controlShapes.size], Modifier.weight(1f)) {
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                s.onClick()
+                            } else
                             Tile(s.icon, s.label, s.state, s.on, Modifier.weight(1f).height(96.dp)) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 s.onClick()
@@ -565,7 +584,19 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, au
 
         Spacer(Modifier.height(12.dp))
         if (!c.ended) {
-            Row(
+            if (ex) Row(
+                Modifier.fillMaxWidth().height(78.dp).clip(CircleShape).background(Color(0xFFF2B8C8))
+                    .clickable {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                        CallManager.hangup(c)
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Rounded.CallEnd, null, tint = Color(0xFF5E1130), modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("End call", color = Color(0xFF5E1130), fontFamily = Body, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+            } else Row(
                 Modifier.fillMaxWidth().height(76.dp).clip(RoundedCornerShape(30.dp)).background(Bit.Danger)
                     .clickable {
                         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -580,6 +611,74 @@ private fun Ongoing(c: UiCall, all: List<UiCall>, name: String, sim: String?, au
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+private val controlShapes = listOf(Shapes.Circle, Shapes.Squircle, Shapes.Clover, Shapes.Gem, Shapes.Pentagon, Shapes.Ripple7)
+
+/** bitHome call header: status pill, a slowly spinning flower avatar, and the name in light + bold. */
+@Composable
+private fun HomeCallHeader(c: UiCall, name: String, sim: String?, timer: String?, status: String, compact: Boolean) {
+    val context = LocalContext.current
+    val spin = rememberInfiniteTransition(label = "spin")
+    val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(30000, easing = LinearEasing)), label = "angle")
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(18.dp))
+        Row(
+            Modifier.clip(CircleShape).background(Bit.Pink).padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(24.dp).clip(Shapes.Sunny).background(if (c.ended) Bit.Error else if (c.active && !c.holding) Color(0xFF9BE7C4) else Bit.PinkText))
+            Spacer(Modifier.width(8.dp))
+            val text = if (timer != null) listOfNotNull(timer, if (c.holding) "On hold" else "HD Voice", sim).joinToString(" · ")
+            else status.lowercase().replaceFirstChar { it.uppercase() }
+            Text(text, color = Bit.PinkText, fontFamily = Body, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+        }
+        val size = if (compact) 110.dp else 214.dp
+        Spacer(Modifier.height(if (compact) 14.dp else 28.dp))
+        Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().graphicsLayer { rotationZ = angle }.clip(Shapes.Flower).background(Bit.Accent))
+            if (c.contact.photoUri != null) {
+                Avatar(listOf(c.contact), size * 0.62f)
+            } else {
+                Text(
+                    name.trim().firstOrNull()?.uppercase() ?: "#",
+                    color = Bit.OnAccent, fontFamily = Body, fontWeight = FontWeight.ExtraBold, fontSize = (size.value * 0.4f).sp,
+                )
+            }
+        }
+        Spacer(Modifier.height(if (compact) 10.dp else 20.dp))
+        val first = name.take(1)
+        Text(
+            buildAnnotatedString {
+                pushStyle(SpanStyle(fontWeight = FontWeight.Light)); append(first); pop()
+                pushStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)); append(name.drop(1)); pop()
+            },
+            fontFamily = Body, fontSize = if (compact) 30.sp else 46.sp, letterSpacing = (-1.2).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        if (!compact) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (c.contact.name != null) Phone.format(context, c.number) else (sim ?: ""),
+                color = Bit.TextDim, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShapeTile(icon: ImageVector, label: String, on: Boolean, shape: androidx.compose.ui.graphics.Shape, modifier: Modifier, onClick: () -> Unit) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.size(80.dp).clip(shape).background(if (on) Bit.Accent else Bit.Tile.copy(alpha = 0.95f)).clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, label, tint = if (on) Bit.OnAccent else Color.White, modifier = Modifier.size(26.dp)) }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            label.lowercase().replaceFirstChar { it.uppercase() },
+            color = if (on) Bit.Accent else Color.White, fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, maxLines = 1,
+        )
     }
 }
 

@@ -43,6 +43,13 @@ object Bit {
     val TextDim: Color get() = palette.textDim
     val Error = Color(0xFFFFB4AB)
     val Danger = Color(0xFFB3261E)
+
+    /** bitHome theme: tiles, pastel shapes and the wallpaper gradient instead of flat black. */
+    val expressive: Boolean get() = palette.expressive
+    val Tile: Color get() = palette.tile
+    val Pink: Color get() = palette.pink
+    val PinkText: Color get() = palette.pinkText
+    val Light: Color get() = palette.light
     val Missed = Color(0xFFFF8A80)
     val Glass = Color(0x0FFFFFFF)
     val GlassEdge = Color(0x24FFFFFF)
@@ -73,7 +80,7 @@ val Display: FontFamily = variable(R.font.unbounded, 600, 700, 800, 900)
 val Mono: FontFamily = variable(R.font.jetbrains_mono, 500, 700)
 
 /** Body text. */
-val Body: FontFamily = variable(R.font.inter, 400, 500, 600, 700, 800)
+val Body: FontFamily = variable(R.font.inter, 300, 400, 500, 600, 700, 800)
 
 private fun scheme() = darkColorScheme(
     primary = Bit.Accent,
@@ -140,6 +147,11 @@ data class Palette(
     val outlineSoft: Color,
     val hairline: Color,
     val textDim: Color,
+    val expressive: Boolean = false,
+    val tile: Color = surfaceHigh,
+    val pink: Color = surfaceHigh,
+    val pinkText: Color = accent,
+    val light: Color = accent,
 )
 
 /** App themes: AMOLED black (default), two accent variants, and Material You gray. */
@@ -151,6 +163,7 @@ object Themes {
         Choice("lilac", "LILAC"),
         Choice("mint", "MINT"),
         Choice("you", "MATERIAL YOU"),
+        Choice("bithome", "BITHOME"),
     )
 
     private fun black(accent: Long, onAccent: Long) = Palette(
@@ -164,6 +177,15 @@ object Themes {
     private val LILAC = black(0xFFEADDFF, 0xFF21005D)
     private val MINT = black(0xFFA6F2C9, 0xFF00391F)
 
+    /** Matches the bitDroid home screen: lavender on purple-gray tiles over a purple-to-teal glow. */
+    val BITHOME = Palette(
+        bg = Color(0xFF120F1C), accent = Color(0xFFCBC2EB), onAccent = Color(0xFF241C4A),
+        surface = Color(0xFF2E2842), surfaceHigh = Color(0xFF3A3352), raised = Color(0xFF463F5E),
+        outline = Color(0xFF6A6188), outlineSoft = Color(0xFF574F72), hairline = Color(0xFF2A2540),
+        textDim = Color(0xFFB9B0D6),
+        expressive = true, tile = Color(0xFF463F5E), pink = Color(0xFF5E3A5A), pinkText = Color(0xFFF6D3EA), light = Color(0xFFECE2FF),
+    )
+
     fun current(context: android.content.Context): String =
         com.bitdroid.dialer.data.Prefs.get(context).getString("app_theme", "amoled") ?: "amoled"
 
@@ -175,6 +197,7 @@ object Themes {
     fun palette(context: android.content.Context, key: String): Palette = when (key) {
         "lilac" -> LILAC
         "mint" -> MINT
+        "bithome" -> BITHOME
         "you" -> {
             // Android's own dark gray surfaces with the wallpaper accent, like Pixel settings.
             val d = androidx.compose.material3.dynamicDarkColorScheme(context)

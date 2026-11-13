@@ -209,6 +209,7 @@ fun CallsScreen(vm: DialerViewModel) {
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 130.dp)) {
             item(key = "head") {
+                if (Bit.expressive) HomeCallsHeader(vm, recents.size, missed, favorites.size) else
                 Column(Modifier.fillMaxWidth().statusBarsPadding()) {
                     Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 16.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         ToggleMark()
@@ -266,7 +267,7 @@ fun CallsScreen(vm: DialerViewModel) {
                 }
             } else {
                 if (favorites.isNotEmpty()) {
-                    item(key = "fh") { SectionRule("FAVORITES") }
+                    if (!Bit.expressive) item(key = "fh") { SectionRule("FAVORITES") }
                     item(key = "favs") { FavoriteGrid(favorites, onCall = { call(context, it.number) }, onOpen = { f ->
                         f.contact.lookupUri?.let { context.startActivity(Intent(Intent.ACTION_VIEW, it)) }
                     }) }
@@ -280,9 +281,15 @@ fun CallsScreen(vm: DialerViewModel) {
                         }
                     }
                 } else {
-                    item(key = "rh2") { SectionRule("RECENT") }
+                    if (!Bit.expressive) item(key = "rh2") { SectionRule("RECENT") } else item(key = "rgap") { Spacer(Modifier.height(10.dp)) }
                     itemsIndexed(recents, key = { _, e -> e.id }) { i, e ->
-                        Box(rowSurface(style, i == 0, i == recents.lastIndex).then(Modifier.animateItem(placementSpec = Bit.placement))) {
+                        val surface = if (Bit.expressive) {
+                            // Missed calls get their own pink pill; the rest share purple-gray tiles.
+                            val pink = e.isMissed
+                            if (pink) Modifier.padding(start = 14.dp, end = 14.dp, top = if (i > 0 && !recents[i - 1].isMissed) 10.dp else 0.dp, bottom = 10.dp).clip(CircleShape).background(Bit.Pink)
+                            else homePanel(i == 0 || recents[i - 1].isMissed, i == recents.lastIndex || recents[i + 1].isMissed)
+                        } else rowSurface(style, i == 0, i == recents.lastIndex)
+                        Box(surface.then(Modifier.animateItem(placementSpec = Bit.placement))) {
                             RecentRow(e, vm)
                         }
                     }
@@ -290,9 +297,11 @@ fun CallsScreen(vm: DialerViewModel) {
             }
         }
 
+        val ex = Bit.expressive
+        val fadeTo = if (ex) Color(0xFF0F1419) else Bit.Black
         Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Bit.Black.copy(alpha = 0.7f), Bit.Black.copy(alpha = 0.85f)))),
+                .background(Brush.verticalGradient(listOf(Color.Transparent, fadeTo.copy(alpha = 0.7f), fadeTo.copy(alpha = 0.85f)))),
         )
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding().navigationBarsPadding().padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
@@ -300,14 +309,29 @@ fun CallsScreen(vm: DialerViewModel) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(
-                Modifier.weight(1f).height(62.dp).clip(CircleShape).background(Bit.Black.copy(alpha = 0.5f))
-                    .border(2.5.dp, Color.White, CircleShape).padding(start = 20.dp, end = 6.dp),
+                if (ex) {
+                    Modifier.weight(1f).height(62.dp).clip(CircleShape).background(Color(0xFF463E60))
+                        .border(2.5.dp, Bit.Accent.copy(alpha = 0.55f), CircleShape).padding(start = 7.dp, end = 6.dp)
+                } else {
+                    Modifier.weight(1f).height(62.dp).clip(CircleShape).background(Bit.Black.copy(alpha = 0.5f))
+                        .border(2.5.dp, Color.White, CircleShape).padding(start = 20.dp, end = 6.dp)
+                },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.Search, null, tint = Color.White, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(12.dp))
+                if (ex) {
+                    Box(Modifier.size(46.dp).clip(CircleShape).background(Bit.Accent), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Search, null, tint = Bit.OnAccent, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                } else {
+                    Icon(Icons.Rounded.Search, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(12.dp))
+                }
                 Box(Modifier.weight(1f)) {
-                    if (query.isEmpty()) Text("Search contacts", color = Bit.TextDim, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    if (query.isEmpty()) {
+                        if (ex) Text("Search contacts", color = Color(0xFFEDE6FF), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                        else Text("Search contacts", color = Bit.TextDim, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
                     BasicTextField(
                         value = query, onValueChange = vm::setQuery, singleLine = true,
                         textStyle = TextStyle(fontFamily = Body, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold),
@@ -319,7 +343,7 @@ fun CallsScreen(vm: DialerViewModel) {
                 if (query.isNotEmpty()) IconButton(onClick = { vm.setQuery("") }) { Icon(Icons.Rounded.Close, "Clear", tint = Color.White) }
             }
             Box(
-                Modifier.size(62.dp).clip(CircleShape).background(Bit.Accent).clickable {
+                Modifier.size(if (ex) 66.dp else 62.dp).clip(if (ex) Shapes.Squircle else CircleShape).background(if (ex) Bit.Light else Bit.Accent).clickable {
                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     vm.push(Screen.KEYPAD)
                 },
@@ -331,11 +355,16 @@ fun CallsScreen(vm: DialerViewModel) {
 
 @Composable
 private fun FavoriteGrid(favs: List<Favorite>, onCall: (Favorite) -> Unit, onOpen: (Favorite) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 14.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-        favs.chunked(3).forEach { row ->
+    val per = if (Bit.expressive) 4 else 3
+    Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 14.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(if (Bit.expressive) 14.dp else 22.dp)) {
+        favs.chunked(per).forEachIndexed { r, row ->
             Row(Modifier.fillMaxWidth()) {
-                row.forEach { f -> Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) { FavoriteItem(f, onCall, onOpen) } }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                row.forEachIndexed { i, f ->
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+                        if (Bit.expressive) HomeFavorite(f, favShapes[(r * per + i) % favShapes.size], onCall, onOpen) else FavoriteItem(f, onCall, onOpen)
+                    }
+                }
+                repeat(per - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -368,6 +397,105 @@ private fun FavoriteItem(f: Favorite, onCall: (Favorite) -> Unit, onOpen: (Favor
     }
 }
 
+private val favShapes = listOf(Shapes.Ripple, Shapes.Gem, Shapes.Clover, Shapes.Circle, Shapes.Sunny, Shapes.Squircle)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HomeFavorite(f: Favorite, shape: androidx.compose.ui.graphics.Shape, onCall: (Favorite) -> Unit, onOpen: (Favorite) -> Unit) {
+    val view = LocalView.current
+    val pop = remember { Animatable(0.6f) }
+    LaunchedEffect(Unit) { pop.animateTo(1f, Bit.bouncy) }
+    Column(
+        Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(RoundedCornerShape(22.dp))
+            .combinedClickable(onClick = { onCall(f) }, onLongClick = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); onOpen(f) })
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box {
+            Avatar(listOf(f.contact), 72.dp, shape = shape)
+            if (f.missed > 0) Box(Modifier.align(Alignment.TopEnd).size(22.dp).clip(Shapes.Sunny).background(Color(0xFFF28FB5)))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(f.contact.name?.substringBefore(' ') ?: f.number, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 84.dp))
+    }
+}
+
+/** bitHome header: a title tile, a lavender missed-call pill and a pink favorites tile, like the home screen widgets. */
+@Composable
+private fun HomeCallsHeader(vm: DialerViewModel, recents: Int, missed: Int, favorites: Int) {
+    val context = LocalContext.current
+    var menu by remember { mutableStateOf(false) }
+    val today = remember { java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date()) }
+    Row(
+        Modifier.fillMaxWidth().statusBarsPadding().padding(start = 14.dp, end = 14.dp, top = 12.dp).height(148.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier.weight(1.3f).fillMaxSize().clip(RoundedCornerShape(40.dp, 14.dp, 40.dp, 40.dp)).background(Bit.Tile)
+                .padding(start = 22.dp, end = 8.dp, top = 8.dp, bottom = 20.dp),
+        ) {
+            Text(
+                buildAnnotatedString {
+                    pushStyle(SpanStyle(fontWeight = FontWeight.Light)); append("Ca"); pop()
+                    pushStyle(SpanStyle(fontWeight = FontWeight.ExtraBold)); append("lls"); pop()
+                },
+                fontFamily = Body, fontSize = 42.sp, letterSpacing = (-1.5).sp,
+                modifier = Modifier.align(Alignment.CenterStart).padding(bottom = 18.dp),
+            )
+            Text("$today · $recents recent", color = Bit.TextDim, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.BottomStart))
+            Box(Modifier.align(Alignment.TopEnd)) {
+                Box(Modifier.size(44.dp).clip(CircleShape).clickable { menu = true }, contentAlignment = Alignment.Center) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Box(Modifier.size(16.dp, 2.5.dp).clip(CircleShape).background(Color.White))
+                        Box(Modifier.size(10.dp, 2.5.dp).clip(CircleShape).background(Color.White))
+                    }
+                }
+                DropdownMenu(menu, { menu = false }, containerColor = Bit.SurfaceHigh) {
+                    DropdownMenuItem(text = { Text("Settings") }, onClick = { menu = false; vm.push(Screen.SETTINGS) })
+                    DropdownMenuItem(text = { Text("Call settings") }, onClick = {
+                        menu = false
+                        try {
+                            context.startActivity(Intent(TelecomManager.ACTION_SHOW_CALL_SETTINGS))
+                        } catch (_: Exception) {
+                        }
+                    })
+                }
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.weight(1f).fillMaxWidth().clip(CircleShape).background(Bit.Accent).padding(start = 8.dp, end = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(48.dp).clip(Shapes.Sunny).background(Bit.OnAccent), contentAlignment = Alignment.Center) {
+                    Text(if (missed > 99) "99+" else "$missed", color = Bit.Accent, fontFamily = Body, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(if (missed == 1) "Missed\ncall" else "Missed\ncalls", color = Bit.OnAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, lineHeight = 17.sp)
+            }
+            Row(
+                Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(14.dp, 30.dp, 30.dp, 30.dp)).background(Bit.Pink).padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(30.dp).clip(Shapes.Heart).background(Bit.PinkText))
+                Spacer(Modifier.width(10.dp))
+                Text("$favorites favorites", color = Bit.PinkText, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, lineHeight = 17.sp)
+            }
+        }
+    }
+}
+
+private fun homePanel(first: Boolean, last: Boolean): Modifier {
+    val shape = RoundedCornerShape(
+        topStart = if (first) 34.dp else 0.dp, topEnd = if (first) 34.dp else 0.dp,
+        bottomStart = if (last) 14.dp else 0.dp, bottomEnd = if (last) 34.dp else 0.dp,
+    )
+    return Modifier.padding(horizontal = 14.dp).clip(shape).background(Bit.Tile)
+        .padding(top = if (first) 4.dp else 0.dp, bottom = if (last) 4.dp else 0.dp)
+}
+
+private val CallEntry.isMissed get() = kind == CallKind.MISSED || kind == CallKind.REJECTED
+
 private fun kindIcon(k: CallKind): ImageVector = when (k) {
     CallKind.OUTGOING -> Icons.AutoMirrored.Rounded.CallMade
     CallKind.MISSED, CallKind.REJECTED -> Icons.AutoMirrored.Rounded.CallMissed
@@ -385,8 +513,24 @@ private fun RecentRow(e: CallEntry, vm: DialerViewModel) {
     val view = LocalView.current
     var menu by remember { mutableStateOf(false) }
     val missed = e.kind == CallKind.MISSED || e.kind == CallKind.REJECTED
+    val ex = Bit.expressive
+    val pink = ex && missed
     val title = e.contact.name ?: Phone.format(context, e.number).ifBlank { "Unknown" }
-    val meta = buildString {
+    val meta = if (ex) buildString {
+        append(
+            when (e.kind) {
+                CallKind.OUTGOING -> "Outgoing"
+                CallKind.MISSED -> "Missed"
+                CallKind.REJECTED -> "Declined"
+                CallKind.BLOCKED -> "Blocked"
+                CallKind.VOICEMAIL -> "Voicemail"
+                CallKind.INCOMING -> "Incoming"
+            },
+        )
+        if (e.count > 1) append(" · ${e.count}×")
+        append(" · ${shortTime(context, e.date)}")
+        if (!missed && e.durationSec > 0) append(" · ${duration(e.durationSec)}")
+    } else buildString {
         append(
             when (e.kind) {
                 CallKind.OUTGOING -> "OUTGOING"
@@ -402,11 +546,31 @@ private fun RecentRow(e: CallEntry, vm: DialerViewModel) {
     }
     Box {
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+            Modifier.fillMaxWidth().clip(if (pink) CircleShape else RoundedCornerShape(24.dp))
                 .combinedClickable(onClick = { call(context, e.number) }, onLongClick = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); menu = true })
                 .padding(horizontal = 12.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (ex) {
+                Avatar(listOf(e.contact), 50.dp, shape = if (pink) Shapes.Gem else Shapes.Circle)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = if (pink) Bit.PinkText else Color.White, fontSize = 17.sp, fontWeight = if (pink) FontWeight.ExtraBold else FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(kindIcon(e.kind), null, tint = if (pink) Bit.PinkText else Bit.TextDim, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(meta, color = if (pink) Bit.PinkText else Bit.TextDim, fontSize = 13.5.sp, fontWeight = if (pink) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Box(
+                    Modifier.size(if (pink) 52.dp else 44.dp)
+                        .clip(if (pink) Shapes.Clover else RoundedCornerShape(15.dp))
+                        .background(if (pink) Bit.PinkText else Color.White.copy(alpha = 0.08f))
+                        .clickable { call(context, e.number) },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Rounded.Call, "Call", tint = if (pink) Color(0xFF4A1E3E) else Bit.Accent, modifier = Modifier.size(20.dp)) }
+            } else {
             Avatar(listOf(e.contact), 52.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
@@ -427,6 +591,7 @@ private fun RecentRow(e: CallEntry, vm: DialerViewModel) {
                 Modifier.size(44.dp).clip(CircleShape).border(2.dp, Bit.GlassEdge, CircleShape).clickable { call(context, e.number) },
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Rounded.Call, "Call", tint = Bit.Accent, modifier = Modifier.size(19.dp)) }
+            }
         }
         DropdownMenu(menu, { menu = false }, containerColor = Bit.SurfaceHigh) {
             DropdownMenuItem(text = { Text("Send message") }, onClick = {

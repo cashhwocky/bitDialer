@@ -44,6 +44,7 @@ import com.bitdroid.dialer.ui.Screen
 import com.bitdroid.dialer.ui.SettingsScreen
 import com.bitdroid.dialer.ui.SetupScreen
 import com.bitdroid.dialer.ui.monetGlow
+import com.bitdroid.dialer.ui.backdrop
 import kotlinx.coroutines.CancellationException
 
 class MainActivity : ComponentActivity() {
@@ -67,7 +68,7 @@ class MainActivity : ComponentActivity() {
             BitTheme {
                 val isDefault by vm.isDefault.collectAsStateWithLifecycle()
                 val monet by vm.monet.collectAsStateWithLifecycle()
-                Box(Modifier.fillMaxSize().background(Bit.Black).monetGlow(monet)) {
+                Box(Modifier.fillMaxSize().backdrop().monetGlow(monet && !Bit.expressive)) {
                     if (!isDefault) {
                         SetupScreen(onSetDefault = ::requestRole, refused = roleRefused.value)
                     } else {
