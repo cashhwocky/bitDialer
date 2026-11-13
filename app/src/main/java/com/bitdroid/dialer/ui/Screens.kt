@@ -1,5 +1,10 @@
 package com.bitdroid.dialer.ui
 
+import androidx.compose.material.icons.automirrored.rounded.Message
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.StarOutline
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -268,9 +273,7 @@ fun CallsScreen(vm: DialerViewModel) {
             } else {
                 if (favorites.isNotEmpty()) {
                     if (!Bit.expressive) item(key = "fh") { SectionRule("FAVORITES") }
-                    item(key = "favs") { FavoriteGrid(favorites, onCall = { call(context, it.number) }, onOpen = { f ->
-                        f.contact.lookupUri?.let { context.startActivity(Intent(Intent.ACTION_VIEW, it)) }
-                    }) }
+                    item(key = "favs") { FavoriteGrid(favorites, onCall = { call(context, it.number) }, onUnpin = vm::unpin) }
                 }
                 if (recents.isEmpty()) {
                     item(key = "empty") {
@@ -354,14 +357,14 @@ fun CallsScreen(vm: DialerViewModel) {
 }
 
 @Composable
-private fun FavoriteGrid(favs: List<Favorite>, onCall: (Favorite) -> Unit, onOpen: (Favorite) -> Unit) {
+private fun FavoriteGrid(favs: List<Favorite>, onCall: (Favorite) -> Unit, onUnpin: (Favorite) -> Unit) {
     val per = if (Bit.expressive) 4 else 3
     Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 14.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(if (Bit.expressive) 14.dp else 22.dp)) {
         favs.chunked(per).forEachIndexed { r, row ->
             Row(Modifier.fillMaxWidth()) {
                 row.forEachIndexed { i, f ->
                     Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
-                        if (Bit.expressive) HomeFavorite(f, favShapes[(r * per + i) % favShapes.size], onCall, onOpen) else FavoriteItem(f, onCall, onOpen)
+                        if (Bit.expressive) HomeFavorite(f, favShapes[(r * per + i) % favShapes.size], onCall, onUnpin) else FavoriteItem(f, onCall, onUnpin)
                     }
                 }
                 repeat(per - row.size) { Spacer(Modifier.weight(1f)) }
@@ -372,13 +375,14 @@ private fun FavoriteGrid(favs: List<Favorite>, onCall: (Favorite) -> Unit, onOpe
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FavoriteItem(f: Favorite, onCall: (Favorite) -> Unit, onOpen: (Favorite) -> Unit) {
+private fun FavoriteItem(f: Favorite, onCall: (Favorite) -> Unit, onUnpin: (Favorite) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     val view = LocalView.current
     val pop = remember { Animatable(0.6f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, Bit.bouncy) }
     Column(
         Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(RoundedCornerShape(24.dp))
-            .combinedClickable(onClick = { onCall(f) }, onLongClick = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); onOpen(f) })
+            .combinedClickable(onClick = { onCall(f) }, onLongClick = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); menu = true })
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -394,6 +398,40 @@ private fun FavoriteItem(f: Favorite, onCall: (Favorite) -> Unit, onOpen: (Favor
         }
         Spacer(Modifier.height(8.dp))
         Text(f.contact.name?.substringBefore(' ') ?: f.number, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 108.dp))
+        FavoriteMenu(f, menu, { menu = false }, onUnpin)
+    }
+}
+
+/** Hold menu for a favorite: unpin, contact card, message. */
+@Composable
+private fun FavoriteMenu(f: Favorite, open: Boolean, onDismiss: () -> Unit, onUnpin: (Favorite) -> Unit) {
+    val context = LocalContext.current
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) onUnpin(f)
+        else android.widget.Toast.makeText(context, "bitDialer needs contacts access to unpin", android.widget.Toast.LENGTH_SHORT).show()
+    }
+    DropdownMenu(open, onDismiss, containerColor = Bit.SurfaceHigh) {
+        DropdownMenuItem(
+            text = { Text("Unpin") },
+            leadingIcon = { Icon(Icons.Rounded.StarOutline, null) },
+            onClick = {
+                onDismiss()
+                if (context.checkSelfPermission(android.Manifest.permission.WRITE_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) onUnpin(f)
+                else ask.launch(android.Manifest.permission.WRITE_CONTACTS)
+            },
+        )
+        f.contact.lookupUri?.let { uri ->
+            DropdownMenuItem(
+                text = { Text("Contact card") },
+                leadingIcon = { Icon(Icons.Rounded.Person, null) },
+                onClick = { onDismiss(); context.startActivity(Intent(Intent.ACTION_VIEW, uri)) },
+            )
+        }
+        DropdownMenuItem(
+            text = { Text("Message") },
+            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Message, null) },
+            onClick = { onDismiss(); context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", f.number, null))) },
+        )
     }
 }
 
@@ -401,13 +439,14 @@ private val favShapes = listOf(Shapes.Ripple, Shapes.Gem, Shapes.Clover, Shapes.
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HomeFavorite(f: Favorite, shape: androidx.compose.ui.graphics.Shape, onCall: (Favorite) -> Unit, onOpen: (Favorite) -> Unit) {
+private fun HomeFavorite(f: Favorite, shape: androidx.compose.ui.graphics.Shape, onCall: (Favorite) -> Unit, onUnpin: (Favorite) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     val view = LocalView.current
     val pop = remember { Animatable(0.6f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, Bit.bouncy) }
     Column(
         Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(RoundedCornerShape(22.dp))
-            .combinedClickable(onClick = { onCall(f) }, onLongClick = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); onOpen(f) })
+            .combinedClickable(onClick = { onCall(f) }, onLongClick = { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); menu = true })
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -417,6 +456,7 @@ private fun HomeFavorite(f: Favorite, shape: androidx.compose.ui.graphics.Shape,
         }
         Spacer(Modifier.height(6.dp))
         Text(f.contact.name?.substringBefore(' ') ?: f.number, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 84.dp))
+        FavoriteMenu(f, menu, { menu = false }, onUnpin)
     }
 }
 

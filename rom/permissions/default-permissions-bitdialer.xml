@@ -8,6 +8,7 @@
         <permission name="android.permission.READ_PHONE_STATE" fixed="false" />
         <permission name="android.permission.READ_PHONE_NUMBERS" fixed="false" />
         <permission name="android.permission.READ_CONTACTS" fixed="false" />
+        <permission name="android.permission.WRITE_CONTACTS" fixed="false" />
         <permission name="android.permission.POST_NOTIFICATIONS" fixed="false" />
     </exception>
 </exceptions>

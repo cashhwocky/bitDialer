@@ -119,6 +119,19 @@ class DialerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Removes a favorite by unstarring the contact. */
+    fun unpin(f: Favorite) {
+        val uri = f.contact.lookupUri ?: return
+        _favorites.value = _favorites.value.filterNot { it.contact.lookupUri == uri }
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { Contacts.unstar(ctx, uri) }
+            if (!ok) {
+                android.widget.Toast.makeText(ctx, "Couldn't unpin this contact", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            refresh()
+        }
+    }
+
     fun deleteFromHistory(number: String) {
         viewModelScope.launch(Dispatchers.IO) { CallLogRepo.delete(ctx, number) }
         _recents.value = _recents.value.filterNot { it.number == number }

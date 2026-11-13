@@ -50,6 +50,14 @@ object Contacts {
         return contact
     }
 
+    /** Unstars a contact so it leaves favorites. Needs WRITE_CONTACTS. */
+    fun unstar(context: Context, lookupUri: Uri): Boolean = try {
+        val values = android.content.ContentValues().apply { put(ContactsContract.Contacts.STARRED, 0) }
+        context.contentResolver.update(lookupUri, values, null, null) > 0
+    } catch (_: Exception) {
+        false
+    }
+
     /** Starred contacts with their first phone number, max [limit]. */
     fun favorites(context: Context, limit: Int = 6): List<Pair<Contact, String>> {
         if (!canRead(context)) return emptyList()
