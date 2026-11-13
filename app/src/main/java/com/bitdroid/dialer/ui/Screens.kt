@@ -22,6 +22,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -945,7 +947,7 @@ private fun IconPicker() {
         Text("App icon", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Text("Your home screen may take a moment to update", color = Bit.TextDim, fontSize = 14.sp)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             com.bitdroid.dialer.data.AppIcons.all.forEach { c ->
                 val on = c.key == current
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -964,7 +966,7 @@ private fun IconPicker() {
                     ) {
                         androidx.compose.foundation.Image(
                             androidx.compose.ui.res.painterResource(
-                                if (c.darkMark) com.bitdroid.dialer.R.drawable.ic_launcher_foreground_dark else com.bitdroid.dialer.R.drawable.ic_launcher_foreground,
+                                c.art ?: if (c.darkMark) com.bitdroid.dialer.R.drawable.ic_launcher_foreground_dark else com.bitdroid.dialer.R.drawable.ic_launcher_foreground,
                             ),
                             contentDescription = c.label,
                             modifier = Modifier.size(80.dp),

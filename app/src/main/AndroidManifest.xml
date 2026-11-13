@@ -104,6 +104,19 @@
             </intent-filter>
         </activity-alias>
 
+        <activity-alias
+            android:name=".IconYou"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_you"
+            android:roundIcon="@mipmap/ic_launcher_you"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- Call screen: over the lock screen, works before first unlock. -->
         <activity
             android:name=".call.InCallActivity"
