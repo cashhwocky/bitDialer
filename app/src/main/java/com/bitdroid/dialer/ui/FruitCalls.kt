@@ -154,10 +154,16 @@ fun FruitCallsScreen(vm: DialerViewModel) {
             }
         }
 
-        // Floating glass tab bar.
+        // Fade the list out under the bar so numbers don't show through.
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp)
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black))),
+        )
+        // Floating glass tab bar, on a dark frosted base so it stays readable.
         Row(
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-                .fillMaxWidth().height(66.dp).glass(CircleShape).glassSweep().padding(horizontal = 6.dp),
+                .fillMaxWidth().height(66.dp).clip(CircleShape).background(Color(0xF2141418))
+                .glass(CircleShape, strength = 0.8f).glassSweep().padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FruitTab(Icons.Rounded.Call, "Recents", on = true) {}
