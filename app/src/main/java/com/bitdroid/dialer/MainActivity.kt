@@ -1,5 +1,7 @@
 package com.bitdroid.dialer
 
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Intent
@@ -64,6 +66,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Bit.apply(this)
         if (savedInstanceState == null) handleIntent(intent)
+        // Quietly look for an update every few hours; Settings → Updates has the install button.
+        lifecycleScope.launch {
+            val info = com.bitdroid.dialer.update.Updater.checkIfDue(this@MainActivity)
+            if (info != null) {
+                android.widget.Toast.makeText(this@MainActivity, "bitDialer update ready · Settings → Updates", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
         setContent {
             BitTheme {
                 val isDefault by vm.isDefault.collectAsStateWithLifecycle()

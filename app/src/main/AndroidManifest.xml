@@ -4,6 +4,8 @@
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
 
     <!-- Calls (granted while bitDialer holds ROLE_DIALER) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
@@ -145,6 +147,9 @@
         <receiver
             android:name=".call.CallActionReceiver"
             android:directBootAware="true"
+            android:exported="false" />
+        <receiver
+            android:name=".update.UpdateReceiver"
             android:exported="false" />
     </application>
 </manifest>

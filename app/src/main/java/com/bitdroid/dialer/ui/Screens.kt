@@ -851,7 +851,8 @@ fun SettingsScreen(vm: DialerViewModel) {
             item { SectionRule("CALL DIAGNOSTICS") }
             item { CallDiagnostics() }
             item { SectionRule("ABOUT") }
-            item { Row2("bitDialer", "Phone app for bitDroid · v0.3.0") {} }
+            item { SectionRule("UPDATES") }
+            item { UpdateCard() }
         }
     }
 }
