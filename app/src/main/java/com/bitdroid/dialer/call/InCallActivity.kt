@@ -236,7 +236,13 @@ class InCallActivity : ComponentActivity() {
                 now = answeredAt
                 startVoice()
             }
-            if (Bit.expressive) {
+            if (Bit.clean) {
+                FruitIncoming(
+                    contact = contact, name = "Test call", sim = "TEST", subtitle = "Answer to try the call screen",
+                    onAnswer = answer, onDecline = { end() }, onMessage = { end() },
+                    onSilence = { CallVibrator.stop(this@InCallActivity) },
+                )
+            } else if (Bit.expressive) {
                 BloomIncoming(
                     contact = contact, number = "", name = "Test call", sim = "TEST", subtitle = "Answer to try the call screen",
                     onAnswer = answer, onDecline = { end() }, onMessage = { end() },
@@ -246,7 +252,8 @@ class InCallActivity : ComponentActivity() {
                 Incoming(contact = contact, number = "", name = "Test call", sim = "TEST", onAnswer = answer, onDecline = { end() })
             }
         } else {
-            BloomOngoing(
+            val ongoing: @Composable (BloomCallState, BloomCallActions) -> Unit = { st, ac -> if (Bit.clean) FruitOngoing(st, ac) else BloomOngoing(st, ac) }
+            ongoing(
                 BloomCallState(
                     name = "Test call", number = "bitDialer robot", contact = contact, sim = "TEST",
                     timer = bloomClock(now - answeredAt), status = "Connected", active = true, ended = false,
@@ -308,8 +315,10 @@ class InCallActivity : ComponentActivity() {
 @Composable
 private fun MovingGradient(useMonet: Boolean, intense: Boolean) {
     val context = LocalContext.current
-    val colors = remember(useMonet) {
-        if (Bit.expressive) {
+    val colors = remember(useMonet, Bit.clean, Bit.expressive) {
+        if (Bit.clean) {
+            listOf(Color(0xFF6E5AFA), Color(0xFF3C82FF), Color(0xFFC85ADC))
+        } else if (Bit.expressive) {
             listOf(Color(0xFF8C6EF0), Color(0xFFF28FB5), Color(0xFF2B9C9C))
         } else if (useMonet) {
             val d = dynamicDarkColorScheme(context)
@@ -357,7 +366,21 @@ private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
         phoneAccounts(context).let { list -> if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null }
     }
     if (c.ringing) {
-        if (Bit.expressive) {
+        if (Bit.clean) {
+            FruitIncoming(
+                contact = c.contact, name = name, sim = sim,
+                subtitle = if (c.contact.name != null) Phone.format(context, c.number) else "Unknown caller",
+                onAnswer = { CallManager.answer(c) },
+                onDecline = { CallManager.decline(c) },
+                onMessage = {
+                    CallManager.decline(c)
+                    if (c.number.isNotBlank()) {
+                        context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                },
+                onSilence = { CallManager.silenceRinger(context) },
+            )
+        } else if (Bit.expressive) {
             BloomIncoming(
                 contact = c.contact, number = c.number, name = name, sim = sim,
                 subtitle = if (c.contact.name != null) Phone.format(context, c.number) else "Unknown caller",
@@ -378,7 +401,7 @@ private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
                 onDecline = { CallManager.decline(c) },
             )
         }
-    } else if (Bit.expressive) {
+    } else if (Bit.expressive || Bit.clean) {
         BloomOngoingFor(c, all, name, sim, audio)
     } else {
         Ongoing(c, all, name, sim, audio)
@@ -421,36 +444,34 @@ private fun BloomOngoingFor(c: UiCall, all: List<UiCall>, name: String, sim: Str
             "SIM ${i + 1} · $label" to { CallManager.chooseSim(c, h) }
         } else emptyList(),
     )
-    BloomOngoing(
-        state,
-        BloomCallActions(
-            onMute = { CallManager.setMuted(audio?.isMuted != true) },
-            onAudio = {
-                if (hasBt) {
-                    CallManager.service?.setAudioRoute(
-                        when (route) {
-                            CallAudioState.ROUTE_BLUETOOTH -> CallAudioState.ROUTE_SPEAKER
-                            CallAudioState.ROUTE_SPEAKER -> CallAudioState.ROUTE_WIRED_OR_EARPIECE
-                            else -> CallAudioState.ROUTE_BLUETOOTH
-                        },
-                    )
-                } else {
-                    CallManager.setSpeaker(route != CallAudioState.ROUTE_SPEAKER)
-                }
-            },
-            onHold = { CallManager.toggleHold(c) },
-            onAdd = { context.startActivity(Intent(Intent.ACTION_DIAL).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
-            onSwap = { CallManager.swap(all) },
-            onMerge = { CallManager.merge(all) },
-            onMessage = {
-                if (c.number.isNotBlank()) {
-                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }
-            },
-            onDigit = { CallManager.dtmf(c, it) },
-            onHangup = { CallManager.hangup(c) },
-        ),
+    val actions = BloomCallActions(
+        onMute = { CallManager.setMuted(audio?.isMuted != true) },
+        onAudio = {
+            if (hasBt) {
+                CallManager.service?.setAudioRoute(
+                    when (route) {
+                        CallAudioState.ROUTE_BLUETOOTH -> CallAudioState.ROUTE_SPEAKER
+                        CallAudioState.ROUTE_SPEAKER -> CallAudioState.ROUTE_WIRED_OR_EARPIECE
+                        else -> CallAudioState.ROUTE_BLUETOOTH
+                    },
+                )
+            } else {
+                CallManager.setSpeaker(route != CallAudioState.ROUTE_SPEAKER)
+            }
+        },
+        onHold = { CallManager.toggleHold(c) },
+        onAdd = { context.startActivity(Intent(Intent.ACTION_DIAL).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+        onSwap = { CallManager.swap(all) },
+        onMerge = { CallManager.merge(all) },
+        onMessage = {
+            if (c.number.isNotBlank()) {
+                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", c.number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        },
+        onDigit = { CallManager.dtmf(c, it) },
+        onHangup = { CallManager.hangup(c) },
     )
+    if (Bit.clean) FruitOngoing(state, actions) else BloomOngoing(state, actions)
 }
 
 /** "4:12", or "1:02:03" past an hour. */

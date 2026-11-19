@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -22,7 +23,7 @@ import com.bitdroid.dialer.R
 
 object Bit {
     /** Current theme colors; a snapshot state, so changing it recolors the whole app live. */
-    var palette by mutableStateOf(Themes.BITHOME)
+    var palette by mutableStateOf(Themes.CLEAN)
 
     /** Loads the saved theme (Material You colors come from the wallpaper). */
     fun apply(context: android.content.Context) {
@@ -50,6 +51,13 @@ object Bit {
     val Pink: Color get() = palette.pink
     val PinkText: Color get() = palette.pinkText
     val Light: Color get() = palette.light
+
+    /** Fruit theme: black, blue-violet gradient, glass. */
+    val clean: Boolean get() = palette.clean
+    val Gradient: Brush get() = Brush.linearGradient(listOf(Color(0xFF4F7CFF), Color(0xFF7B5CF5)))
+    val GradEnd = Color(0xFF7B5CF5)
+    val Info = Color(0xFF9CB2FF)
+    val MissedPink = Color(0xFFFF8FA3)
     val Missed = Color(0xFFFF8A80)
     val Glass = Color(0x0FFFFFFF)
     val GlassEdge = Color(0x24FFFFFF)
@@ -152,6 +160,7 @@ data class Palette(
     val pink: Color = surfaceHigh,
     val pinkText: Color = accent,
     val light: Color = accent,
+    val clean: Boolean = false,
 )
 
 /** App themes: AMOLED black (default), two accent variants, and Material You gray. */
@@ -159,6 +168,7 @@ object Themes {
     data class Choice(val key: String, val label: String)
 
     val all = listOf(
+        Choice("clean", "FRUIT"),
         Choice("bithome", "BITHOME"),
         Choice("amoled", "AMOLED"),
         Choice("lilac", "LILAC"),
@@ -177,6 +187,14 @@ object Themes {
     private val LILAC = black(0xFFEADDFF, 0xFF21005D)
     private val MINT = black(0xFFA6F2C9, 0xFF00391F)
 
+    /** Fruit (stored as "clean"): true black with a blue-violet gradient and glass. */
+    val CLEAN = Palette(
+        bg = Color(0xFF000000), accent = Color(0xFF6C74FA), onAccent = Color(0xFFFFFFFF),
+        surface = Color(0xFF17171A), surfaceHigh = Color(0xFF232327), raised = Color(0xFF2C2C31),
+        outline = Color(0xFF3A3A40), outlineSoft = Color(0xFF2E2E33), hairline = Color(0xFF222226),
+        textDim = Color(0xFF8E8E96), tile = Color(0xFF232327), clean = true,
+    )
+
     /** Matches the bitDroid home screen: lavender on purple-gray tiles over a purple-to-teal glow. */
     val BITHOME = Palette(
         bg = Color(0xFF120F1C), accent = Color(0xFFCBC2EB), onAccent = Color(0xFF241C4A),
@@ -187,7 +205,7 @@ object Themes {
     )
 
     fun current(context: android.content.Context): String =
-        com.bitdroid.dialer.data.Prefs.get(context).getString("app_theme", "bithome") ?: "bithome"
+        com.bitdroid.dialer.data.Prefs.get(context).getString("app_theme", "clean") ?: "clean"
 
     fun set(context: android.content.Context, key: String) {
         com.bitdroid.dialer.data.Prefs.get(context).edit().putString("app_theme", key).apply()
@@ -198,6 +216,7 @@ object Themes {
         "lilac" -> LILAC
         "mint" -> MINT
         "bithome" -> BITHOME
+        "clean" -> CLEAN
         "you" -> {
             // Android's own dark gray surfaces with the wallpaper accent, like Pixel settings.
             val d = androidx.compose.material3.dynamicDarkColorScheme(context)

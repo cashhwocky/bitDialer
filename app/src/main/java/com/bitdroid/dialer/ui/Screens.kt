@@ -201,6 +201,10 @@ fun ReturnToCallBar() {
 
 @Composable
 fun CallsScreen(vm: DialerViewModel) {
+    if (Bit.clean) {
+        FruitCallsScreen(vm)
+        return
+    }
     val recents by vm.recents.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val missed by vm.missed.collectAsStateWithLifecycle()
@@ -406,7 +410,7 @@ private fun FavoriteItem(f: Favorite, onCall: (Favorite) -> Unit, onUnpin: (Favo
 
 /** Hold menu for a favorite: unpin, contact card, message. */
 @Composable
-private fun FavoriteMenu(f: Favorite, open: Boolean, onDismiss: () -> Unit, onUnpin: (Favorite) -> Unit) {
+internal fun FavoriteMenu(f: Favorite, open: Boolean, onDismiss: () -> Unit, onUnpin: (Favorite) -> Unit) {
     val context = LocalContext.current
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) onUnpin(f)
@@ -546,7 +550,7 @@ private fun kindIcon(k: CallKind): ImageVector = when (k) {
     CallKind.INCOMING -> Icons.AutoMirrored.Rounded.CallReceived
 }
 
-private fun duration(sec: Long) = if (sec >= 3600) "%d:%02d:%02d".format(sec / 3600, (sec / 60) % 60, sec % 60) else "%d:%02d".format(sec / 60, sec % 60)
+internal fun duration(sec: Long) = if (sec >= 3600) "%d:%02d:%02d".format(sec / 3600, (sec / 60) % 60, sec % 60) else "%d:%02d".format(sec / 60, sec % 60)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
