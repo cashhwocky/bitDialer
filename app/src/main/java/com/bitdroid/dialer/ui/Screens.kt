@@ -742,7 +742,7 @@ fun KeypadScreen(vm: DialerViewModel) {
                 Row(horizontalArrangement = Arrangement.spacedBy(26.dp)) {
                     row.forEach { (d, letters) ->
                         Column(
-                            Modifier.size(84.dp).clip(CircleShape).background(Bit.Glass).border(1.5.dp, Bit.GlassEdge, CircleShape)
+                            (if (Bit.clean) Modifier.size(84.dp).clip(Shapes.Squircle).background(Bit.Tile) else Modifier.size(84.dp).clip(CircleShape).background(Bit.Glass).border(1.5.dp, Bit.GlassEdge, CircleShape))
                                 .combinedClickable(
                                     onClick = { press(d) },
                                     onLongClick = when (d) {
@@ -765,7 +765,7 @@ fun KeypadScreen(vm: DialerViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(40.dp)) {
             Spacer(Modifier.size(56.dp))
             Box(
-                Modifier.size(86.dp).clip(CircleShape).background(Bit.Accent).clickable {
+                Modifier.size(if (Bit.clean) 92.dp else 86.dp).clip(if (Bit.clean) Shapes.Clover else CircleShape).background(Bit.Accent).clickable {
                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                     if (number.isNotBlank()) {
                         call(context, number)

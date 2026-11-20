@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -96,7 +97,13 @@ fun FruitCallsScreen(vm: DialerViewModel) {
                         }
                     }
                     Row(Modifier.padding(start = 20.dp, top = 12.dp, end = 20.dp), verticalAlignment = Alignment.Bottom) {
-                        Text("Calls", fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = 34.sp, letterSpacing = (-0.6).sp)
+                        Text(
+                            androidx.compose.ui.text.buildAnnotatedString {
+                                pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Light)); append("Ca"); pop()
+                                pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold)); append("lls"); pop()
+                            },
+                            fontFamily = Body, fontSize = 38.sp, letterSpacing = (-1.2).sp,
+                        )
                         if (missed > 0) {
                             Spacer(Modifier.width(10.dp))
                             Text("$missed MISSED", style = mono(12f, color = Bit.MissedPink, spacing = 0.5f), modifier = Modifier.padding(bottom = 7.dp))
@@ -116,7 +123,7 @@ fun FruitCallsScreen(vm: DialerViewModel) {
                 if (favorites.isNotEmpty() && !onlyMissed) {
                     item(key = "favs") {
                         Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 12.dp, start = 8.dp, end = 8.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                            favorites.take(4).forEach { f -> FruitFavorite(f, onCall = { call(context, f.number) }, onUnpin = vm::unpin) }
+                            favorites.take(4).forEachIndexed { i, f -> FruitFavorite(f, favShapesFruit[i % favShapesFruit.size], onCall = { call(context, f.number) }, onUnpin = vm::unpin) }
                         }
                     }
                 }
@@ -128,7 +135,17 @@ fun FruitCallsScreen(vm: DialerViewModel) {
                         )
                     }
                 } else {
-                    items(shown, key = { it.id }) { e -> FruitRecent(e, vm) }
+                    itemsIndexed(shown, key = { _, e -> e.id }) { i, e ->
+                        val first = i == 0
+                        val last = i == shown.lastIndex
+                        val shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                            topStart = if (first) 30.dp else 0.dp, topEnd = if (first) 30.dp else 0.dp,
+                            bottomStart = if (last) 30.dp else 0.dp, bottomEnd = if (last) 30.dp else 0.dp,
+                        )
+                        Box(Modifier.padding(horizontal = 14.dp).clip(shape).background(Bit.Tile).padding(top = if (first) 4.dp else 0.dp, bottom = if (last) 4.dp else 0.dp)) {
+                            FruitRecent(e, vm)
+                        }
+                    }
                 }
             }
         }
@@ -149,7 +166,7 @@ private fun androidx.compose.foundation.layout.RowScope.FruitTab(icon: ImageVect
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FruitFavorite(f: com.bitdroid.dialer.data.Favorite, onCall: () -> Unit, onUnpin: (com.bitdroid.dialer.data.Favorite) -> Unit) {
+private fun FruitFavorite(f: com.bitdroid.dialer.data.Favorite, shape: androidx.compose.ui.graphics.Shape, onCall: () -> Unit, onUnpin: (com.bitdroid.dialer.data.Favorite) -> Unit) {
     val view = LocalView.current
     var menu by remember { mutableStateOf(false) }
     Column(
@@ -159,13 +176,8 @@ private fun FruitFavorite(f: com.bitdroid.dialer.data.Favorite, onCall: () -> Un
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box {
-            if (f.missed > 0) {
-                Box(Modifier.size(70.dp).clip(CircleShape).background(Bit.Gradient).padding(3.dp).clip(CircleShape).background(Color.Black).padding(3.dp)) {
-                    Avatar(listOf(f.contact), 58.dp)
-                }
-            } else {
-                Avatar(listOf(f.contact), 64.dp, Modifier.padding(3.dp))
-            }
+            Avatar(listOf(f.contact), 70.dp, shape = shape)
+            if (f.missed > 0) Box(Modifier.align(Alignment.TopEnd).size(20.dp).clip(Shapes.Sunny).background(Color(0xFFF28FB5)))
         }
         Spacer(Modifier.height(6.dp))
         Text(
@@ -175,6 +187,8 @@ private fun FruitFavorite(f: com.bitdroid.dialer.data.Favorite, onCall: () -> Un
         FavoriteMenu(f, menu, { menu = false }, onUnpin)
     }
 }
+
+private val favShapesFruit = listOf(Shapes.Ripple, Shapes.Clover, Shapes.Circle, Shapes.Ripple7)
 
 @Composable
 private fun FruitRecent(e: CallEntry, vm: DialerViewModel) {
@@ -220,7 +234,7 @@ private fun FruitRow(contact: Contact, title: String, sub: String, time: String?
             .padding(start = 18.dp).height(70.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(listOf(contact), 46.dp)
+        Avatar(listOf(contact), 48.dp, shape = if (missed) Shapes.Ripple7 else Shapes.Circle)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Row(Modifier.weight(1f).padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -231,9 +245,10 @@ private fun FruitRow(contact: Contact, title: String, sub: String, time: String?
                 if (time != null) {
                     Text(time, style = mono(11f, FontWeight.Medium, Bit.TextDim, 0.3f), modifier = Modifier.padding(horizontal = 10.dp))
                 }
-                GlassCircle(34.dp, onClick = onCall) { Icon(Icons.Rounded.Call, "Call", tint = Bit.Info, modifier = Modifier.size(16.dp)) }
+                Box(Modifier.size(40.dp).squish(onClick = onCall).clip(Shapes.Clover).background(if (missed) Bit.PinkText else Bit.Accent), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Call, "Call", tint = Bit.OnAccent, modifier = Modifier.size(17.dp))
+                }
             }
-            Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.08f)))
         }
     }
 }
