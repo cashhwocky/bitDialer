@@ -9,7 +9,7 @@ object AppIcons {
     data class Choice(val key: String, val label: String, val alias: String, val bg: Long, val darkMark: Boolean, val art: Int? = null)
 
     val all = listOf(
-        Choice("glass", "GLASS", ".IconGlass", 0xFF2E6FE0, false, com.bitdroid.dialer.R.drawable.ic_launcher_foreground_glass),
+        Choice("glass", "DUO", ".IconGlass", 0xFF13406E, false, com.bitdroid.dialer.R.drawable.ic_launcher_foreground_glass),
         Choice("you", "RING", ".IconYou", 0xFFDCD4F6, true, com.bitdroid.dialer.R.drawable.ic_launcher_foreground_you),
         Choice("white", "WHITE", ".IconWhite", 0xFFFFFFFF, true),
         Choice("black", "AMOLED", ".IconBlack", 0xFF000000, false),
