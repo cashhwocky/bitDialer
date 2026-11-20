@@ -18,7 +18,7 @@ android {
         applicationId = "com.bitdroid.dialer"
         minSdk = 31
         targetSdk = 35
-        versionCode = 22
+        versionCode = 23
         versionName = "0.4.0"
     }
 
@@ -82,6 +82,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("dev.chrisbanes.haze:haze:1.6.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
 }
