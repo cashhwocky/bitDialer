@@ -18,7 +18,7 @@ android {
         applicationId = "com.bitdroid.dialer"
         minSdk = 31
         targetSdk = 35
-        versionCode = 29
+        versionCode = 30
         versionName = "0.4.0"
     }
 
