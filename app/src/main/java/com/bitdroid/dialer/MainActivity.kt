@@ -1,5 +1,12 @@
 package com.bitdroid.dialer
 
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Dialpad
+import androidx.compose.material.icons.rounded.History
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
 import android.Manifest
@@ -98,9 +105,10 @@ class MainActivity : ComponentActivity() {
                         }
                         val target = vm.stack.last()
                         val depth = vm.stack.size
+                        val haze = remember { dev.chrisbanes.haze.HazeState() }
                         AnimatedContent(
                             targetState = target to depth,
-                            modifier = Modifier.graphicsLayer {
+                            modifier = Modifier.then(if (Bit.clean) Modifier.hazeSource(haze) else Modifier).graphicsLayer {
                                 val p = progress
                                 scaleX = 1f - 0.1f * p
                                 scaleY = 1f - 0.1f * p
@@ -125,6 +133,50 @@ class MainActivity : ComponentActivity() {
                         }
                         androidx.compose.foundation.layout.Box(Modifier.align(androidx.compose.ui.Alignment.TopCenter)) {
                             com.bitdroid.dialer.ui.ReturnToCallBar()
+                        }
+                        // Fruit: floating glass tabs with a sliding lens, plus contact search.
+                        if (Bit.clean) {
+                            val tabs = listOf(Screen.CALLS, Screen.KEYPAD, Screen.SETTINGS)
+                            val query by vm.query.collectAsStateWithLifecycle()
+                            if (target != Screen.CALLS && vm.searchOpen) vm.searchOpen = false
+                            com.bitdroid.dialer.ui.GlassTabBar(
+                                haze = haze,
+                                tabs = listOf(
+                                    com.bitdroid.dialer.ui.TabItem(androidx.compose.material.icons.Icons.Rounded.History, "Recents"),
+                                    com.bitdroid.dialer.ui.TabItem(androidx.compose.material.icons.Icons.Rounded.Dialpad, "Keypad"),
+                                    com.bitdroid.dialer.ui.TabItem(androidx.compose.material.icons.Icons.Rounded.Settings, "Settings"),
+                                ),
+                                selected = tabs.indexOf(target).coerceAtLeast(0),
+                                onSelect = { i ->
+                                    vm.stack.clear()
+                                    vm.stack.add(Screen.CALLS)
+                                    if (i > 0) vm.stack.add(tabs[i])
+                                },
+                                searching = vm.searchOpen,
+                                onSearch = {
+                                    if (vm.searchOpen) {
+                                        vm.setQuery("")
+                                        vm.searchOpen = false
+                                    } else {
+                                        vm.stack.clear()
+                                        vm.stack.add(Screen.CALLS)
+                                        vm.searchOpen = true
+                                    }
+                                },
+                                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                            ) {
+                                val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+                                androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+                                androidx.compose.foundation.layout.Box {
+                                    if (query.isEmpty()) androidx.compose.material3.Text("Search contacts", color = androidx.compose.ui.graphics.Color(0xFFD0D0D8), fontSize = 17.sp)
+                                    androidx.compose.foundation.text.BasicTextField(
+                                        query, vm::setQuery, singleLine = true,
+                                        textStyle = androidx.compose.ui.text.TextStyle(color = androidx.compose.ui.graphics.Color.White, fontSize = 17.sp),
+                                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Bit.Accent),
+                                        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

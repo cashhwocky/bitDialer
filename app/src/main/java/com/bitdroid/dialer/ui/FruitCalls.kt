@@ -75,13 +75,11 @@ fun FruitCallsScreen(vm: DialerViewModel) {
     val context = LocalContext.current
     val view = LocalView.current
     var onlyMissed by remember { mutableStateOf(false) }
-    var searching by remember { mutableStateOf(false) }
     DisposableEffect(Unit) { onDispose { vm.markMissedSeen() } }
     val shown = if (onlyMissed) recents.filter { it.kind == CallKind.MISSED || it.kind == CallKind.REJECTED } else recents
 
-    val haze = remember { dev.chrisbanes.haze.HazeState() }
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize().hazeSource(haze), contentPadding = PaddingValues(bottom = 120.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
             item(key = "head") {
                 Column(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -96,33 +94,12 @@ fun FruitCallsScreen(vm: DialerViewModel) {
                                 ) { Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (on) Color.White else Color(0xFFA0A0AA)) }
                             }
                         }
-                        Spacer(Modifier.weight(1f))
-                        GlassCircle(40.dp, onClick = { searching = !searching; if (!searching) vm.setQuery("") }) {
-                            Icon(if (searching) Icons.Rounded.Close else Icons.Rounded.Search, "Search", tint = Color.White, modifier = Modifier.size(19.dp))
-                        }
                     }
                     Row(Modifier.padding(start = 20.dp, top = 12.dp, end = 20.dp), verticalAlignment = Alignment.Bottom) {
                         Text("Calls", fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = 34.sp, letterSpacing = (-0.6).sp)
                         if (missed > 0) {
                             Spacer(Modifier.width(10.dp))
                             Text("$missed MISSED", style = mono(12f, color = Bit.MissedPink, spacing = 0.5f), modifier = Modifier.padding(bottom = 7.dp))
-                        }
-                    }
-                    if (searching) {
-                        Row(
-                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).fillMaxWidth().height(48.dp).glass(CircleShape).padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Rounded.Search, null, tint = Color(0xFFD0D0D8), modifier = Modifier.size(19.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Box(Modifier.weight(1f)) {
-                                if (query.isEmpty()) Text("Search contacts", color = Color(0xFFD0D0D8), fontSize = 16.5.sp)
-                                BasicTextField(
-                                    query, vm::setQuery, singleLine = true,
-                                    textStyle = TextStyle(fontFamily = Body, color = Color.White, fontSize = 16.5.sp),
-                                    cursorBrush = SolidColor(Bit.Accent), modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
                         }
                     }
                 }
@@ -156,25 +133,6 @@ fun FruitCallsScreen(vm: DialerViewModel) {
             }
         }
 
-        // Floating tab bar: real blur of the list behind it, tinted dark so the labels stay readable.
-        Row(
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-                .fillMaxWidth().height(66.dp).frosted(haze, CircleShape).padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FruitTab(Icons.Rounded.Call, "Recents", on = true) {}
-            FruitTab(Icons.Rounded.Person, "Contacts") {
-                try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.CONTENT_URI))
-                } catch (_: Exception) {
-                }
-            }
-            FruitTab(Icons.Rounded.Dialpad, "Keypad") {
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                vm.push(Screen.KEYPAD)
-            }
-            FruitTab(Icons.Rounded.Settings, "Settings") { vm.push(Screen.SETTINGS) }
-        }
     }
 }
 

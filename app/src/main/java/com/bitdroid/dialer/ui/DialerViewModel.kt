@@ -1,5 +1,7 @@
 package com.bitdroid.dialer.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import android.app.Application
 import android.app.role.RoleManager
 import android.database.ContentObserver
@@ -30,6 +32,9 @@ class DialerViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx get() = getApplication<Application>()
 
     val stack = mutableStateListOf(Screen.CALLS)
+
+    /** Fruit: contact search is open in the floating tab bar. */
+    var searchOpen by androidx.compose.runtime.mutableStateOf(false)
 
     private val _isDefault = MutableStateFlow(checkDefault())
     val isDefault: StateFlow<Boolean> = _isDefault

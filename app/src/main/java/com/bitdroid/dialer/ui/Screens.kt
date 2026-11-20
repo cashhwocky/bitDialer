@@ -701,7 +701,7 @@ fun KeypadScreen(vm: DialerViewModel) {
         vm.typed.value = number + d
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = if (Bit.clean) 84.dp else 0.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 14.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.back() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
             Spacer(Modifier.weight(1f))
