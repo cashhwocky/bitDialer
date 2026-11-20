@@ -801,7 +801,7 @@ fun SettingsScreen(vm: DialerViewModel) {
             IconButton(onClick = { vm.back() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
             Text("Settings", fontFamily = Display, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = if (Bit.clean) 130.dp else 40.dp)) {
             item { SectionRule("LOOK") }
             item { ThemePicker() }
             item {
