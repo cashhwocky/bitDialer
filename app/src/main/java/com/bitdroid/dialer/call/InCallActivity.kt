@@ -236,13 +236,13 @@ class InCallActivity : ComponentActivity() {
                 now = answeredAt
                 startVoice()
             }
-            if (Bit.clean) {
+            if (false) {
                 FruitIncoming(
                     contact = contact, name = "Test call", sim = "TEST", subtitle = "Answer to try the call screen",
                     onAnswer = answer, onDecline = { end() }, onMessage = { end() },
                     onSilence = { CallVibrator.stop(this@InCallActivity) },
                 )
-            } else if (Bit.expressive) {
+            } else if (Bit.expressive || Bit.clean) {
                 BloomIncoming(
                     contact = contact, number = "", name = "Test call", sim = "TEST", subtitle = "Answer to try the call screen",
                     onAnswer = answer, onDecline = { end() }, onMessage = { end() },
@@ -252,7 +252,7 @@ class InCallActivity : ComponentActivity() {
                 Incoming(contact = contact, number = "", name = "Test call", sim = "TEST", onAnswer = answer, onDecline = { end() })
             }
         } else {
-            val ongoing: @Composable (BloomCallState, BloomCallActions) -> Unit = { st, ac -> if (Bit.clean) FruitOngoing(st, ac) else BloomOngoing(st, ac) }
+            val ongoing: @Composable (BloomCallState, BloomCallActions) -> Unit = { st, ac -> BloomOngoing(st, ac) }
             ongoing(
                 BloomCallState(
                     name = "Test call", number = "bitDialer robot", contact = contact, sim = "TEST",
@@ -366,7 +366,7 @@ private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
         phoneAccounts(context).let { list -> if (list.size > 1) "SIM ${list.indexOf(h) + 1}" else null }
     }
     if (c.ringing) {
-        if (Bit.clean) {
+        if (false) {
             FruitIncoming(
                 contact = c.contact, name = name, sim = sim,
                 subtitle = if (c.contact.name != null) Phone.format(context, c.number) else "Unknown caller",
@@ -380,7 +380,7 @@ private fun CallScreen(c: UiCall, all: List<UiCall>, audio: CallAudioState?) {
                 },
                 onSilence = { CallManager.silenceRinger(context) },
             )
-        } else if (Bit.expressive) {
+        } else if (Bit.expressive || Bit.clean) {
             BloomIncoming(
                 contact = c.contact, number = c.number, name = name, sim = sim,
                 subtitle = if (c.contact.name != null) Phone.format(context, c.number) else "Unknown caller",
@@ -471,7 +471,7 @@ private fun BloomOngoingFor(c: UiCall, all: List<UiCall>, name: String, sim: Str
         onDigit = { CallManager.dtmf(c, it) },
         onHangup = { CallManager.hangup(c) },
     )
-    if (Bit.clean) FruitOngoing(state, actions) else BloomOngoing(state, actions)
+    BloomOngoing(state, actions)
 }
 
 /** "4:12", or "1:02:03" past an hour. */

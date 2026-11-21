@@ -89,10 +89,10 @@ fun FruitCallsScreen(vm: DialerViewModel) {
                             listOf(false to "All", true to "Missed").forEach { (m, label) ->
                                 val on = onlyMissed == m
                                 Box(
-                                    Modifier.fillMaxHeight().clip(CircleShape).background(if (on) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+                                    Modifier.fillMaxHeight().clip(CircleShape).background(if (on) Bit.Accent else Color.Transparent)
                                         .squish { onlyMissed = m }.padding(horizontal = 14.dp),
                                     contentAlignment = Alignment.Center,
-                                ) { Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (on) Color.White else Color(0xFFA0A0AA)) }
+                                ) { Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (on) Bit.OnAccent else Color(0xFFE8E0FF)) }
                             }
                         }
                     }
@@ -122,7 +122,12 @@ fun FruitCallsScreen(vm: DialerViewModel) {
             } else {
                 if (favorites.isNotEmpty() && !onlyMissed) {
                     item(key = "favs") {
-                        Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 12.dp, start = 8.dp, end = 8.dp), horizontalArrangement = Arrangement.SpaceAround) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 16.dp, bottom = 12.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(32.dp)).background(Bit.Surface.copy(alpha = 0.85f))
+                                .padding(vertical = 14.dp, horizontal = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                        ) {
                             favorites.take(4).forEachIndexed { i, f -> FruitFavorite(f, favShapesFruit[i % favShapesFruit.size], onCall = { call(context, f.number) }, onUnpin = vm::unpin) }
                         }
                     }
@@ -136,8 +141,15 @@ fun FruitCallsScreen(vm: DialerViewModel) {
                     }
                 } else {
                     itemsIndexed(shown, key = { _, e -> e.id }) { i, e ->
-                        val first = i == 0
-                        val last = i == shown.lastIndex
+                        fun miss(x: CallEntry) = x.kind == CallKind.MISSED || x.kind == CallKind.REJECTED
+                        if (miss(e)) {
+                            Box(Modifier.padding(start = 14.dp, end = 14.dp, top = if (i > 0 && !miss(shown[i - 1])) 10.dp else 0.dp, bottom = 10.dp).clip(CircleShape).background(Bit.Pink)) {
+                                FruitRecent(e, vm)
+                            }
+                            return@itemsIndexed
+                        }
+                        val first = i == 0 || miss(shown[i - 1])
+                        val last = i == shown.lastIndex || miss(shown[i + 1])
                         val shape = androidx.compose.foundation.shape.RoundedCornerShape(
                             topStart = if (first) 30.dp else 0.dp, topEnd = if (first) 30.dp else 0.dp,
                             bottomStart = if (last) 30.dp else 0.dp, bottomEnd = if (last) 30.dp else 0.dp,
